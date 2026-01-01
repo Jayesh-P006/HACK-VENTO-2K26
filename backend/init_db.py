@@ -1,5 +1,10 @@
 import pymysql
 from pathlib import Path
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
 
 SCHEMA_PATH = Path(__file__).parent.parent / "database" / "schema.sql"
 
@@ -22,13 +27,24 @@ if chunk:
 statements = [s for s in statements if not s.lower().startswith("create database") and not s.lower().startswith("use ")]
 
 # Ensure database exists
-bootstrap = pymysql.connect(host="localhost", user="root", password="jpassword", autocommit=True)
+bootstrap = pymysql.connect(
+    host=os.getenv('DB_HOST', 'localhost'), 
+    user=os.getenv('DB_USER', 'root'), 
+    password=os.getenv('DB_PASSWORD', ''), 
+    autocommit=True
+)
 with bootstrap.cursor() as cur:
-    cur.execute("CREATE DATABASE IF NOT EXISTS placement_portal;")
+    cur.execute(f"CREATE DATABASE IF NOT EXISTS {os.getenv('DB_NAME', 'placement_portal')};")
 bootstrap.close()
 
 # Now operate inside the DB
-conn = pymysql.connect(host="localhost", user="root", password="jpassword", database="placement_portal", autocommit=True)
+conn = pymysql.connect(
+    host=os.getenv('DB_HOST', 'localhost'), 
+    user=os.getenv('DB_USER', 'root'), 
+    password=os.getenv('DB_PASSWORD', ''), 
+    database=os.getenv('DB_NAME', 'placement_portal'), 
+    autocommit=True
+)
 cur = conn.cursor()
 
 # Ensure views can be recreated if script ran before

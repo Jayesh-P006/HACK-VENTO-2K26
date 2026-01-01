@@ -1,7 +1,7 @@
 import os
 from datetime import timedelta, datetime
 from pathlib import Path
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
@@ -14,7 +14,7 @@ from io import BytesIO
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='../frontend', static_url_path='')
 
 # Configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
@@ -28,6 +28,15 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 db.init_app(app)
 CORS(app)
 jwt = JWTManager(app)
+
+# Serve frontend files
+@app.route('/')
+def index():
+    return send_from_directory(app.static_folder, 'index.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    return send_from_directory(app.static_folder, path)
 
 # Helper function to get user ID from JWT
 def get_user_id():

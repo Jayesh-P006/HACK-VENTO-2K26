@@ -1,12 +1,17 @@
 import pymysql
 from werkzeug.security import generate_password_hash
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
 
 # Database connection
 conn = pymysql.connect(
-    host='localhost',
-    user='root',
-    password='jpassword',
-    database='placement_portal',
+    host=os.getenv('DB_HOST', 'localhost'),
+    user=os.getenv('DB_USER', 'root'),
+    password=os.getenv('DB_PASSWORD', ''),
+    database=os.getenv('DB_NAME', 'placement_portal'),
     autocommit=True
 )
 
