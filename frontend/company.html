@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Company Dashboard</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <main>
+    <div class="page-shell">
+      <div class="navbar-lite">
+        <div class="brand">
+          <div class="pill">Company</div>
+          <span data-greeting class="pill">Hello</span>
+        </div>
+        <div class="nav" style="flex-wrap: wrap;">
+          <a href="student.html" data-role-link="1">Student</a>
+          <a href="company.html" class="active">Company</a>
+          <a href="admin.html" data-role-link="3">Admin</a>
+        </div>
+        <div class="user-badge">
+          <div class="user-avatar" data-user-avatar>C</div>
+          <div>
+            <div data-user-name>Company</div>
+            <div class="minor" data-user-email>email</div>
+          </div>
+          <button class="btn btn-ghost" data-logout>Logout</button>
+        </div>
+      </div>
+
+      <section class="grid grid-4" id="company-stats"></section>
+
+      <section class="grid grid-2" style="margin-top: 18px; align-items: start;">
+        <div>
+          <div class="section-title"><h3>Job postings</h3><span class="badge badge-blue">Live</span></div>
+          <div id="company-jobs" class="grid" style="gap: 14px;"></div>
+        </div>
+        <div class="card">
+          <div class="section-title"><h3>Post a job</h3><span class="badge badge-amber">New</span></div>
+          <form id="job-form" class="grid" style="gap: 12px;">
+            <div class="form-grid">
+              <div>
+                <label for="title">Title</label>
+                <input name="title" id="title" required placeholder="Software Engineer">
+              </div>
+              <div>
+                <label for="job_type">Job Type</label>
+                <select name="job_type" id="job_type">
+                  <option>Full-Time</option>
+                  <option>Internship</option>
+                  <option>Part-Time</option>
+                </select>
+              </div>
+              <div>
+                <label for="location">Location</label>
+                <input name="location" id="location" required placeholder="Remote / Onsite">
+              </div>
+              <div>
+                <label for="salary_range">Salary Range</label>
+                <input name="salary_range" id="salary_range" placeholder="₹8-12 LPA">
+              </div>
+              <div>
+                <label for="min_cgpa">Min CGPA</label>
+                <input type="number" step="0.1" name="min_cgpa" id="min_cgpa" value="0">
+              </div>
+              <div>
+                <label for="application_deadline">Application Deadline</label>
+                <input type="date" name="application_deadline" id="application_deadline" required>
+              </div>
+              <div>
+                <label for="eligible_branches">Eligible Branches</label>
+                <input name="eligible_branches" id="eligible_branches" placeholder="CSE, IT">
+              </div>
+            </div>
+            <div>
+              <label for="description">Description</label>
+              <textarea name="description" id="description" required placeholder="Role overview"></textarea>
+            </div>
+            <div>
+              <label for="requirements">Requirements</label>
+              <textarea name="requirements" id="requirements" placeholder="Skills, tech stack"></textarea>
+            </div>
+            <button class="btn btn-primary" type="submit">Post Job</button>
+          </form>
+        </div>
+      </section>
+
+      <section style="margin-top: 22px;" class="grid grid-2" align-items="start">
+        <div>
+          <div class="section-title"><h3>Announcements</h3><span class="badge badge-amber">Portal</span></div>
+          <div id="company-announcements" class="grid" style="gap: 12px;"></div>
+        </div>
+        <div class="card">
+          <div class="section-title"><h3 id="applicants-title">Applicants</h3><span class="badge badge-blue">Live</span></div>
+          <div class="card glass" style="overflow-x: auto;">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Name</th><th>Branch</th><th>CGPA</th><th>Phone</th><th>Skills</th><th>Applied</th><th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="applicants-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script>
+    const API_BASE = 'http://localhost:5000/api';
+
+    function getAuth() {
+      try {
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        if (!token || !user) return null;
+        return { token, user };
+      } catch (_) { return null; }
+    }
+
+    function showToast(msg, type = 'info') {
+      let stack = document.getElementById('toast-stack');
+      if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'toast-stack';
+        stack.className = 'toast-stack';
+        document.body.appendChild(stack);
+      }
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.textContent = msg;
+      stack.appendChild(t);
+      setTimeout(() => t.remove(), 4200);
+    }
+
+    async function api(path, opts = {}) {
+      const auth = getAuth();
+      if (!auth) { window.location.href = 'index.html'; return; }
+      const headers = { 'Content-Type': 'application/json', ...opts.headers };
+      headers.Authorization = `Bearer ${auth.token}`;
+      const resp = await fetch(`${API_BASE}${path}`, {
+        method: opts.method || 'GET',
+        headers,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    const auth = getAuth();
+    if (!auth || auth.user.role_id !== 2) { window.location.href = 'index.html'; }
+
+    if (document.querySelector('[data-user-name]')) {
+      document.querySelector('[data-user-name]').textContent = auth.user.email;
+    }
+    if (document.querySelector('[data-user-email]')) {
+      document.querySelector('[data-user-email]').textContent = auth.user.email;
+    }
+    if (document.querySelector('[data-user-avatar]')) {
+      document.querySelector('[data-user-avatar]').textContent = 'C';
+    }
+
+    document.querySelector('[data-logout]')?.addEventListener('click', () => {
+      localStorage.clear();
+      window.location.href = 'index.html';
+    });
+
+    const jobsEl = document.querySelector('#company-jobs');
+    const statsEl = document.querySelector('#company-stats');
+    const annEl = document.querySelector('#company-announcements');
+    const applicantsEl = document.querySelector('#applicants-table');
+
+    let jobs = [];
+    let currentJobId = null;
+
+    async function loadAll() {
+      try {
+        const [jobsRes, annRes] = await Promise.all([
+          api('/company/jobs'),
+          api('/announcements'),
+        ]);
+        jobs = jobsRes || [];
+        renderStats();
+        renderJobs();
+        renderAnnouncements(annRes || []);
+        if (jobs[0]) selectJob(jobs[0].id);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function renderStats() {
+      const total = jobs.length;
+      const active = jobs.filter(j => j.status === 'Approved').length;
+      const pending = jobs.filter(j => j.status === 'Pending').length;
+      const closed = jobs.filter(j => j.status === 'Closed').length;
+      statsEl.innerHTML = `
+        <div class="card animate"><p class="minor">Total Jobs</p><h2>${total}</h2></div>
+        <div class="card animate"><p class="minor">Active</p><h2>${active}</h2></div>
+        <div class="card animate"><p class="minor">Pending</p><h2>${pending}</h2></div>
+        <div class="card animate"><p class="minor">Closed</p><h2>${closed}</h2></div>`;
+    }
+
+    function renderJobs() {
+      jobsEl.innerHTML = jobs.map(job => `
+        <article class="job-card animate">
+          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+            <div><h3>${job.title}</h3><div class="job-meta">${job.job_type} • ${job.location}</div></div>
+            <span class="badge badge-${job.status === 'Approved' ? 'green' : job.status === 'Pending' ? 'amber' : 'blue'}">${job.status}</span>
+          </div>
+          <p class="minor">${job.description || '—'}</p>
+          <div class="job-meta">
+            <span>CGPA ${job.min_cgpa || 0}+</span>
+            ${job.salary_range ? `<span>${job.salary_range}</span>` : ''}
+            <span>${new Date(job.application_deadline).toLocaleDateString()}</span>
+          </div>
+          <button class="btn btn-ghost" data-view-job="${job.id}" style="margin-top: 10px;">View applicants</button>
+        </article>
+      `).join('');
+      document.querySelectorAll('[data-view-job]').forEach(btn => {
+        btn.addEventListener('click', (e) => selectJob(e.target.getAttribute('data-view-job')));
+      });
+    }
+
+    async function selectJob(jobId) {
+      currentJobId = jobId;
+      document.querySelector('#applicants-title').textContent = `Applicants for Job #${jobId}`;
+      try {
+        const list = await api(`/company/job/${jobId}/applicants`);
+        renderApplicants(list || []);
+      } catch (err) {
+        applicantsEl.innerHTML = `<tr><td colspan="7" class="minor">${err.message}</td></tr>`;
+      }
+    }
+
+    function renderAnnouncements(list) {
+      annEl.innerHTML = list.length ? list.map(a => `
+        <div class="card animate"><h4>${a.title}</h4><p class="minor">${a.message}</p><span class="badge badge-amber">${new Date(a.created_at).toLocaleDateString()}</span></div>
+      `).join('') : '<p class="minor">No announcements</p>';
+    }
+
+    function renderApplicants(list) {
+      applicantsEl.innerHTML = list.length ? list.map(app => `
+        <tr>
+          <td>${app.full_name}</td>
+          <td class="minor">${app.branch || '—'}</td>
+          <td>${app.cgpa || '—'}</td>
+          <td>${app.phone || '—'}</td>
+          <td class="minor">${(app.skills || '').slice(0, 30)}</td>
+          <td class="minor">${new Date(app.applied_at).toLocaleDateString()}</td>
+          <td><select data-app-id="${app.application_id}" data-status-select>
+            <option value="Applied" ${app.application_status === 'Applied' ? 'selected' : ''}>Applied</option>
+            <option value="Shortlisted" ${app.application_status === 'Shortlisted' ? 'selected' : ''}>Shortlisted</option>
+            <option value="Interview" ${app.application_status === 'Interview' ? 'selected' : ''}>Interview</option>
+            <option value="Selected" ${app.application_status === 'Selected' ? 'selected' : ''}>Selected</option>
+            <option value="Rejected" ${app.application_status === 'Rejected' ? 'selected' : ''}>Rejected</option>
+          </select></td>
+        </tr>
+      `).join('') : '<tr><td colspan="7" class="minor">No applicants yet</td></tr>';
+      document.querySelectorAll('[data-status-select]').forEach(sel => {
+        sel.addEventListener('change', updateAppStatus);
+      });
+    }
+
+    async function updateAppStatus(e) {
+      const appId = e.target.getAttribute('data-app-id');
+      const newStatus = e.target.value;
+      try {
+        await api('/company/applicant-status', { method: 'PUT', body: { application_id: appId, status: newStatus } });
+        showToast('Status updated', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    const form = document.querySelector('#job-form');
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = new FormData(form);
+      const payload = Object.fromEntries(data.entries());
+      payload.min_cgpa = parseFloat(payload.min_cgpa || 0);
+      const btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Posting...';
+      try {
+        await api('/company/jobs', { method: 'POST', body: payload });
+        showToast('Job posted (pending approval)', 'success');
+        form.reset();
+        await loadAll();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Post Job';
+      }
+    });
+
+    loadAll();
+  </script>
+</body>
+</html>

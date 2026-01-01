@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <main>
+    <div class="page-shell">
+      <div class="navbar-lite">
+        <div class="brand">
+          <div class="pill">Student</div>
+          <span data-greeting class="pill">Welcome</span>
+        </div>
+        <div class="nav" style="flex-wrap: wrap;">
+          <a href="student.html" class="active">Dashboard</a>
+          <a href="company.html" data-role-link="2">Company</a>
+          <a href="admin.html" data-role-link="3">Admin</a>
+        </div>
+        <div class="user-badge">
+          <div class="user-avatar" data-user-avatar>A</div>
+          <div>
+            <div data-user-name>Student</div>
+            <div class="minor" data-user-email>email</div>
+          </div>
+          <button class="btn btn-ghost" data-logout>Logout</button>
+        </div>
+      </div>
+
+      <!-- DASHBOARD STATS SECTION -->
+      <section class="grid grid-4" id="stats"></section>
+
+      <!-- NOTIFICATION CENTER WIDGET -->
+      <section class="grid grid-1" style="margin-top: 18px;">
+        <div class="grid" style="gap: 12px;">
+          <div class="section-title">
+            <h3>📢 Notifications</h3>
+            <button class="btn btn-ghost" id="refresh-notif" style="padding: 4px 10px; font-size: 12px;">Refresh</button>
+          </div>
+          <div id="notification-widget" style="grid-column: span 1;"></div>
+        </div>
+      </section>
+
+      <!-- LIVE DRIVE FEED WIDGET -->
+      <section class="grid grid-1" style="margin-top: 18px;">
+        <div class="grid" style="gap: 12px;">
+          <div class="section-title">
+            <h3>🏢 Upcoming Company Visits (Drive Feed)</h3>
+            <button class="btn btn-ghost" id="refresh-drives" style="padding: 4px 10px; font-size: 12px;">Refresh</button>
+          </div>
+          <div id="drive-feed-widget" class="grid" style="gap: 12px;"></div>
+        </div>
+      </section>
+
+      <!-- APPLICATION KANBAN BOARD -->
+      <section style="margin-top: 18px;">
+        <div class="section-title">
+          <h3>📋 My Applications (Kanban View)</h3>
+          <button class="btn btn-ghost" id="refresh-kanban" style="padding: 4px 10px; font-size: 12px;">Refresh</button>
+        </div>
+        <div id="kanban-widget" style="margin-top: 12px;"></div>
+      </section>
+
+      <!-- RESUME SCORER WIDGET -->
+      <section style="margin-top: 18px;">
+        <div id="resume-scorer-widget"></div>
+      </section>
+
+      <!-- SKILL GAP VISUALIZER WIDGET -->
+      <section style="margin-top: 18px;">
+        <div id="skill-gap-widget"></div>
+      </section>
+
+      <!-- INTERVIEW REPOSITORY WIDGET -->
+      <section style="margin-top: 18px;">
+        <div class="section-title">
+          <h3>💼 Interview Experience Repository</h3>
+          <span class="badge badge-blue">Community Shared</span>
+        </div>
+        <div id="interview-repo-widget" style="margin-top: 12px;"></div>
+      </section>
+
+      <!-- LEGACY SECTIONS (for reference) -->
+      <section class="grid grid-2" style="margin-top: 18px; align-items: start; display: none;">
+        <div class="grid" style="gap: 12px;">
+          <div class="section-title">
+            <h3>Live jobs</h3>
+            <span class="badge badge-blue">Refresh to update</span>
+          </div>
+          <div id="jobs-list" class="grid" style="gap: 14px;"></div>
+        </div>
+        <div class="grid" style="gap: 12px;">
+          <div class="section-title">
+            <h3>Announcements</h3>
+            <span class="badge badge-amber">New</span>
+          </div>
+          <div id="announcements" class="grid" style="gap: 12px;"></div>
+        </div>
+      </section>
+
+      <section style="margin-top: 24px;">
+        <div class="section-title">
+          <h3>Applications</h3>
+          <p class="minor">Grouped by status</p>
+        </div>
+        <div id="applications" class="grid" style="gap: 14px;"></div>
+      </section>
+    </div>
+  </main>
+  <script src="assets/js/dashboard-widgets.js"></script>
+  <script>
+    const API_BASE = 'http://localhost:5000/api';
+
+    function getAuth() {
+      try {
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        if (!token || !user) return null;
+        return { token, user };
+      } catch (_) { return null; }
+    }
+
+    const auth = getAuth();
+    if (!auth || auth.user.role_id !== 1) { window.location.href = 'index.html'; }
+
+    // Setup user info
+    const nameEl = document.querySelector('[data-user-name]');
+    const emailEl = document.querySelector('[data-user-email]');
+    const avatarEl = document.querySelector('[data-user-avatar]');
+    if (nameEl) nameEl.textContent = auth.user.email;
+    if (emailEl) emailEl.textContent = auth.user.email;
+    if (avatarEl) avatarEl.textContent = auth.user.email.charAt(0).toUpperCase();
+
+    document.querySelector('[data-logout]')?.addEventListener('click', () => {
+      localStorage.clear();
+      window.location.href = 'index.html';
+    });
+
+    // Initialize dashboard manager
+    const manager = new DashboardManager(auth);
+
+    // Initialize all widgets
+    const driveFeed = new DriveFeedWidget('#drive-feed-widget', manager);
+    const kanban = new KanbanBoardWidget('#kanban-widget', manager);
+    const notifications = new NotificationCenterWidget('#notification-widget', manager);
+    const interviewRepo = new InterviewRepositoryWidget('#interview-repo-widget', manager);
+    const resumeScorer = new ResumeScorlerWidget('#resume-scorer-widget', manager);
+    const skillGap = new SkillGapVisualizerWidget('#skill-gap-widget', manager);
+
+    // Register widgets with manager
+    manager.registerWidget('driveFeed', driveFeed);
+    manager.registerWidget('kanbanBoard', kanban);
+    manager.registerWidget('notificationCenter', notifications);
+    manager.registerWidget('interviewRepo', interviewRepo);
+
+    // Load dashboard data
+    async function loadDashboard() {
+      try {
+        const statsEl = document.querySelector('#stats');
+        
+        // Fetch summary data
+        const [jobsRes, appsRes] = await Promise.all([
+          manager.api('/student/jobs'),
+          manager.api('/student/applications'),
+        ]);
+
+        const jobs = jobsRes || [];
+        const applications = appsRes || [];
+
+        // Render stats
+        const eligible = jobs.filter(j => !j.has_applied).length;
+        const applied = applications.length;
+        const shortlisted = applications.filter(a => a.status === 'Shortlisted' || a.status === 'Interview').length;
+        const selected = applications.filter(a => a.status === 'Selected').length;
+
+        statsEl.innerHTML = `
+          <div class="card animate"><p class="minor">Eligible Jobs</p><h2>${eligible}</h2></div>
+          <div class="card animate"><p class="minor">Applications</p><h2>${applied}</h2></div>
+          <div class="card animate"><p class="minor">Shortlisted</p><h2>${shortlisted}</h2></div>
+          <div class="card animate"><p class="minor">Selected</p><h2>${selected}</h2></div>
+        `;
+
+        // Load widgets with mock data (in production, fetch from API)
+        const mockVisits = [
+          {
+            id: 1,
+            company_name: 'TechCorp Solutions',
+            recruitment_type: 'On-Campus Recruitment',
+            visit_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            visit_time: '10:00 AM',
+            location: 'Main Campus',
+            description: 'Annual recruitment drive for software engineers',
+            expected_ctc_range: '8-12 LPA',
+            eligibility_criteria: 'JavaScript, React, Node.js, 7+ CGPA',
+          },
+          {
+            id: 2,
+            company_name: 'CloudInnovate Inc',
+            recruitment_type: 'Virtual Hiring',
+            visit_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+            visit_time: '2:00 PM',
+            location: 'Online',
+            description: 'Internship and full-time positions for cloud engineers',
+            expected_ctc_range: '10-15 LPA',
+            eligibility_criteria: 'Python, AWS, Docker, 7.5+ CGPA',
+          },
+        ];
+
+        const mockNotifications = [
+          {
+            id: 1,
+            title: 'Interview Scheduled',
+            message: 'Your interview for SDE position at TechCorp is scheduled on March 15, 2025 at 10 AM',
+            type: 'interview_schedule',
+            priority: 'high',
+            created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          },
+          {
+            id: 2,
+            title: 'Application Update',
+            message: 'Your application for Sr. Developer at CloudInnovate has been moved to Shortlist',
+            type: 'application_update',
+            priority: 'medium',
+            created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+          },
+        ];
+
+        const mockInterviews = [
+          {
+            id: 1,
+            company_name: 'TechCorp',
+            interview_type: 'Technical',
+            interview_round: 1,
+            difficulty_level: 'Medium',
+            outcome: 'Passed',
+            rating: 4,
+            topics_covered: 'JavaScript, React, OOP, System Design',
+            experience_summary: 'Great experience. Panel was friendly and asked practical questions about React hooks.',
+          },
+          {
+            id: 2,
+            company_name: 'StartupXYZ',
+            interview_type: 'HR Round',
+            interview_round: 2,
+            difficulty_level: 'Easy',
+            outcome: 'Passed',
+            rating: 5,
+            topics_covered: 'Career goals, team fit, salary expectations',
+            experience_summary: 'Smooth HR round. They discussed company culture and growth opportunities.',
+          },
+        ];
+
+        // Render all widgets
+        await driveFeed.render(mockVisits);
+        await kanban.render(applications);
+        await notifications.render(mockNotifications);
+        await interviewRepo.render(mockInterviews);
+        resumeScorer.render();
+        skillGap.render();
+
+        manager.showToast('Dashboard loaded successfully', 'success');
+      } catch (err) {
+        console.error('Dashboard load error:', err);
+        manager.showToast(err.message, 'error');
+      }
+    }
+
+    // Refresh button handlers
+    document.querySelector('#refresh-drives')?.addEventListener('click', loadDashboard);
+    document.querySelector('#refresh-kanban')?.addEventListener('click', loadDashboard);
+    document.querySelector('#refresh-notif')?.addEventListener('click', loadDashboard);
+
+    // Load on page load
+    loadDashboard();
+  </script>
+</body>
+</html>

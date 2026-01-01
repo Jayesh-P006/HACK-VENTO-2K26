@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <main>
+    <div class="page-shell">
+      <div class="navbar-lite">
+        <div class="brand">
+          <div class="pill">Admin</div>
+          <span data-greeting class="pill">Welcome</span>
+        </div>
+        <div class="nav" style="flex-wrap: wrap;">
+          <a href="student.html" data-role-link="1">Student</a>
+          <a href="company.html" data-role-link="2">Company</a>
+          <a href="admin.html" class="active">Admin</a>
+        </div>
+        <div class="user-badge">
+          <div class="user-avatar" data-user-avatar>A</div>
+          <div>
+            <div data-user-name>Admin</div>
+            <div class="minor" data-user-email>email</div>
+          </div>
+          <button class="btn btn-ghost" data-logout>Logout</button>
+        </div>
+      </div>
+
+      <section class="grid grid-4" id="analytics-cards"></section>
+
+      <section class="grid grid-2" style="margin-top: 18px;">
+        <div id="placement-rate"></div>
+        <div class="grid grid-2" id="job-types"></div>
+      </section>
+
+      <section style="margin-top: 18px;">
+        <div class="section-title"><h3>Branch wise placement</h3><span class="badge badge-blue">Live</span></div>
+        <div class="grid grid-3" id="branch-stats"></div>
+      </section>
+
+      <section class="grid grid-2" style="margin-top: 20px; align-items: start;">
+        <div>
+          <div class="section-title"><h3>Pending users</h3><span class="badge badge-amber">Verify</span></div>
+          <div id="pending-users" class="grid" style="gap: 12px;"></div>
+        </div>
+        <div>
+          <div class="section-title"><h3>Job approvals</h3><span class="badge badge-amber">Review</span></div>
+          <div id="pending-jobs" class="grid" style="gap: 12px;"></div>
+        </div>
+      </section>
+
+      <section class="grid grid-2" style="margin-top: 22px; align-items: start;">
+        <div>
+          <div class="section-title"><h3>Announcements</h3><span class="badge badge-blue">Broadcast</span></div>
+          <div id="admin-announcements" class="grid" style="gap: 12px;"></div>
+        </div>
+        <div class="card">
+          <div class="section-title"><h3>Create announcement</h3></div>
+          <form id="announcement-form" class="grid" style="gap: 12px;">
+            <div>
+              <label for="title">Title</label>
+              <input name="title" id="title" required placeholder="Placement drive update">
+            </div>
+            <div>
+              <label for="message">Message</label>
+              <textarea name="message" id="message" required placeholder="Share details, deadlines, links"></textarea>
+            </div>
+            <div>
+              <label for="target_role">Target Audience</label>
+              <select name="target_role" id="target_role">
+                <option value="">All</option>
+                <option value="1">Students</option>
+                <option value="2">Companies</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" type="submit">Create Announcement</button>
+          </form>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script>
+    const API_BASE = 'http://localhost:5000/api';
+
+    function getAuth() {
+      try {
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        if (!token || !user) return null;
+        return { token, user };
+      } catch (_) { return null; }
+    }
+
+    function showToast(msg, type = 'info') {
+      let stack = document.getElementById('toast-stack');
+      if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'toast-stack';
+        stack.className = 'toast-stack';
+        document.body.appendChild(stack);
+      }
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.textContent = msg;
+      stack.appendChild(t);
+      setTimeout(() => t.remove(), 4200);
+    }
+
+    async function api(path, opts = {}) {
+      const auth = getAuth();
+      if (!auth) { window.location.href = 'index.html'; return; }
+      const headers = { 'Content-Type': 'application/json', ...opts.headers };
+      headers.Authorization = `Bearer ${auth.token}`;
+      const resp = await fetch(`${API_BASE}${path}`, {
+        method: opts.method || 'GET',
+        headers,
+        body: opts.body ? JSON.stringify(opts.body) : undefined,
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    const auth = getAuth();
+    if (!auth || auth.user.role_id !== 3) { window.location.href = 'index.html'; }
+
+    if (document.querySelector('[data-user-name]')) {
+      document.querySelector('[data-user-name]').textContent = 'Admin';
+    }
+    if (document.querySelector('[data-user-email]')) {
+      document.querySelector('[data-user-email]').textContent = auth.user.email;
+    }
+    if (document.querySelector('[data-user-avatar]')) {
+      document.querySelector('[data-user-avatar]').textContent = 'A';
+    }
+
+    document.querySelector('[data-logout]')?.addEventListener('click', () => {
+      localStorage.clear();
+      window.location.href = 'index.html';
+    });
+
+    const analyticsCards = document.querySelector('#analytics-cards');
+    const placementRate = document.querySelector('#placement-rate');
+    const branchStats = document.querySelector('#branch-stats');
+    const jobTypes = document.querySelector('#job-types');
+    const pendingUsersEl = document.querySelector('#pending-users');
+    const pendingJobsEl = document.querySelector('#pending-jobs');
+    const announcementsEl = document.querySelector('#admin-announcements');
+
+    async function load() {
+      try {
+        const [analytics, users, jobs, anns] = await Promise.all([
+          api('/admin/analytics'),
+          api('/admin/pending-users'),
+          api('/admin/pending-jobs'),
+          api('/admin/announcements'),
+        ]);
+        renderAnalytics(analytics || {});
+        renderPendingUsers(users || []);
+        renderPendingJobs(jobs || []);
+        renderAnnouncements(anns || []);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function renderAnalytics(a) {
+      const overall = a.overall || {};
+      analyticsCards.innerHTML = `
+        <div class="card animate"><p class="minor">Total Students</p><h2>${overall.total_students || 0}</h2></div>
+        <div class="card animate"><p class="minor">Placed</p><h2>${overall.placed_students || 0}</h2></div>
+        <div class="card animate"><p class="minor">Companies</p><h2>${overall.total_companies || 0}</h2></div>
+        <div class="card animate"><p class="minor">Active Jobs</p><h2>${overall.total_jobs || 0}</h2></div>`;
+      const rate = overall.placement_percentage || 0;
+      placementRate.innerHTML = `<div class="card"><h3>Placement Rate: ${rate}%</h3><div class="progress"><span style="width:${rate}%"></span></div></div>`;
+      branchStats.innerHTML = (a.branch_wise || []).map(b => `<div class="card"><h4>${b.branch}</h4><div class="progress"><span style="width:${b.total ? (b.placed/b.total)*100 : 0}%"></span></div></div>`).join('');
+      jobTypes.innerHTML = (a.job_types || []).map(j => `<div class="card"><h4>${j.type}</h4><span>${j.count}</span></div>`).join('');
+    }
+
+    function renderPendingUsers(users) {
+      pendingUsersEl.innerHTML = users.length ? users.map(u => `
+        <div class="card"><h4>${u.role_id === 1 ? 'Student' : 'Company'}</h4>
+        <p class="minor">${u.email}</p>
+        <button class="btn btn-primary" data-verify="${u.id}">Verify</button></div>
+      `).join('') : '<p class="minor">No pending users</p>';
+      document.querySelectorAll('[data-verify]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.target.getAttribute('data-verify');
+          try {
+            await api(`/admin/verify-user/${id}`, { method: 'PUT' });
+            showToast('User verified', 'success');
+            load();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        });
+      });
+    }
+
+    function renderPendingJobs(jobs) {
+      pendingJobsEl.innerHTML = jobs.length ? jobs.map(j => `
+        <div class="card"><h4>${j.title}</h4>
+        <p class="minor">${j.company_name}</p>
+        <div class="inline-actions">
+          <button class="btn btn-primary" data-approve="${j.id}">Approve</button>
+          <button class="btn btn-ghost" data-reject="${j.id}">Reject</button>
+        </div></div>
+      `).join('') : '<p class="minor">No pending jobs</p>';
+      document.querySelectorAll('[data-approve], [data-reject]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.target.getAttribute('data-approve') || e.target.getAttribute('data-reject');
+          const status = e.target.hasAttribute('data-approve') ? 'Approved' : 'Rejected';
+          try {
+            await api(`/admin/approve-job/${id}`, { method: 'PUT', body: { status } });
+            showToast(`Job ${status.toLowerCase()}`, 'success');
+            load();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        });
+      });
+    }
+
+    function renderAnnouncements(list) {
+      announcementsEl.innerHTML = list.length ? list.map(a => `<div class="card"><h4>${a.title}</h4><p class="minor">${a.message}</p></div>`).join('') : '<p class="minor">No announcements</p>';
+    }
+
+    const form = document.querySelector('#announcement-form');
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = new FormData(form);
+      const payload = {
+        title: data.get('title'),
+        message: data.get('message'),
+        target_role: data.get('target_role') ? parseInt(data.get('target_role')) : null,
+      };
+      const btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Posting...';
+      try {
+        await api('/admin/announcements', { method: 'POST', body: payload });
+        showToast('Announcement posted', 'success');
+        form.reset();
+        load();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Announcement';
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>
