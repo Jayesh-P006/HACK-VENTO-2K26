@@ -33,10 +33,20 @@ CREATE TABLE students (
     enrollment_number VARCHAR(50) UNIQUE NOT NULL,
     branch VARCHAR(100) NOT NULL,
     cgpa DECIMAL(3,2) NOT NULL,
+    tenth_percentage DECIMAL(5,2),
+    twelfth_percentage DECIMAL(5,2),
     graduation_year INT NOT NULL,
     phone VARCHAR(15),
     resume_url VARCHAR(500),
+    ats_score INT,
+    ats_feedback TEXT,
+    ats_calculated_at TIMESTAMP NULL,
     skills TEXT,
+    experience TEXT,
+    projects TEXT,
+    certifications TEXT,
+    linkedin_url VARCHAR(500),
+    github_url VARCHAR(500),
     profile_completed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -113,33 +123,27 @@ CREATE TABLE announcements (
     INDEX idx_target (target_role)
 );
 
--- Insert Default Admin User
--- Password: admin123 (hashed using Werkzeug security)
-INSERT INTO users (email, password_hash, role_id, is_verified) VALUES
-('admin@university.edu', 'pbkdf2:sha256:600000$samplehash$adminhash', 3, TRUE);
+-- Student Verification Table
+CREATE TABLE student_verification (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    student_id INT NOT NULL,
+    status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+    INDEX idx_status (status),
+    INDEX idx_student (student_id)
+);
 
--- Insert Sample Student
-INSERT INTO users (email, password_hash, role_id, is_verified) VALUES
-('student@university.edu', 'pbkdf2:sha256:600000$samplehash$studenthash', 1, TRUE);
-
-INSERT INTO students (user_id, full_name, enrollment_number, branch, cgpa, graduation_year, phone, profile_completed) VALUES
-(2, 'John Doe', 'EN2024001', 'Computer Science', 8.5, 2026, '9876543210', TRUE);
-
--- Insert Sample Company
-INSERT INTO users (email, password_hash, role_id, is_verified) VALUES
-('company@tech.com', 'pbkdf2:sha256:600000$samplehash$companyhash', 2, TRUE);
-
-INSERT INTO companies (user_id, company_name, industry, hr_name, hr_phone, company_website) VALUES
-(3, 'TechCorp Solutions', 'Software Development', 'Jane Smith', '9876543211', 'https://techcorp.com');
-
--- Insert Sample Jobs
-INSERT INTO jobs (company_id, title, job_type, description, requirements, location, salary_range, min_cgpa, eligible_branches, application_deadline, status) VALUES
-(1, 'Software Engineering Intern', 'Internship', 'Join our team as a software engineering intern. Work on cutting-edge projects with experienced mentors.', 'Python, React, JavaScript basics', 'Bangalore', '₹30,000 - ₹50,000/month', 7.0, 'Computer Science,Information Technology', '2026-06-30', 'Approved'),
-(1, 'Full Stack Developer', 'Full-Time', 'Looking for passionate full-stack developers to build scalable web applications.', 'React, Node.js, MongoDB, 2+ years experience', 'Remote', '₹8-12 LPA', 7.5, 'Computer Science,Information Technology,Electronics', '2026-07-15', 'Approved');
-
--- Insert Sample Application
-INSERT INTO applications (student_id, job_id, status) VALUES
-(1, 1, 'Applied');
+-- Student Blacklist Table
+CREATE TABLE student_blacklist (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    student_id INT NOT NULL,
+    reason TEXT,
+    blacklisted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+    INDEX idx_student (student_id)
+);
 
 -- Create Views for Analytics
 

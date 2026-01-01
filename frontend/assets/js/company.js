@@ -69,6 +69,22 @@ function renderJobs() {
     </article>
   `).join('');
   animateStagger('.job-card');
+  
+  // Attach click listener after rendering - redirect to applicants page
+  document.querySelectorAll('[data-view-applicants]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const jobId = btn.getAttribute('data-view-applicants');
+      if (jobId) {
+        // Redirect to applicants page with job ID
+        window.location.href = `applicants.html?job=${jobId}`;
+      }
+    });
+  });
+  
+  // Automatically load applicants for the first job
+  if (jobs.length > 0 && !currentJobId) {
+    selectJob(jobs[0].id);
+  }
 }
 
 function badgeByStatus(status) {
@@ -85,12 +101,18 @@ jobsEl?.addEventListener('click', (e) => {
 
 async function selectJob(jobId, showToastFlag = false) {
   currentJobId = jobId;
-  applicantsTitle.textContent = `Applicants for Job #${jobId}`;
+  // Find the job title
+  const job = jobs.find(j => j.id == jobId);
+  const jobTitle = job ? job.title : `Job #${jobId}`;
+  applicantsTitle.textContent = `Applicants for ${jobTitle}`;
+  console.log(`Loading applicants for job ${jobId}...`);
   try {
     const list = await api(`/company/job/${jobId}/applicants`);
+    console.log('Applicants loaded:', list);
     renderApplicants(list || []);
     if (showToastFlag) showToast('Loaded applicants', 'info');
   } catch (err) {
+    console.error('Error loading applicants:', err);
     applicantsEl.innerHTML = `<tr><td colspan="7" class="minor">${err.message}</td></tr>`;
   }
 }
