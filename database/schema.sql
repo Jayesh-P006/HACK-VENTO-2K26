@@ -71,6 +71,8 @@ CREATE TABLE jobs (
     location VARCHAR(255),
     salary_range VARCHAR(100),
     min_cgpa DECIMAL(3,2) DEFAULT 0.00,
+    min_10th_percentage DECIMAL(5,2) DEFAULT NULL,
+    min_12th_percentage DECIMAL(5,2) DEFAULT NULL,
     eligible_branches TEXT COMMENT 'Comma-separated branch names',
     application_deadline DATE NOT NULL,
     status ENUM('Pending', 'Approved', 'Rejected', 'Closed') DEFAULT 'Pending',

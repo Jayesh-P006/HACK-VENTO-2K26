@@ -1,17 +1,18 @@
 import os
-from datetime import timedelta
+from datetime import timedelta, datetime
+from pathlib import Path
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
-from models import db, User, Student, Company, Job, Application, Announcement
+from models import db, User, Student, Company, Job, Application, Announcement, StudentVerification
 from sqlalchemy import func, or_, and_
-from werkzeug.utils import secure_filename
 import openpyxl
 from io import BytesIO
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from the backend directory
+env_path = Path(__file__).parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 app = Flask(__name__)
 
@@ -34,11 +35,14 @@ def get_user_id():
     identity = get_jwt_identity()
     return int(identity) if isinstance(identity, str) else identity
 
+
 # Register blueprints
 from company_advanced_routes import company_bp
 from admin_routes import admin_bp
+from resume_routes import resume_bp
 app.register_blueprint(company_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(resume_bp)
 
 # ==================== Authentication Routes ====================
 
@@ -74,6 +78,14 @@ def register():
                 phone=data.get('phone', '')
             )
             db.session.add(student)
+            db.session.flush()  # Get student ID
+            
+            # Create verification request for admin approval
+            verification = StudentVerification(
+                student_id=student.id,
+                status='Pending'
+            )
+            db.session.add(verification)
         
         elif data['role_id'] == 2:  # Company
             company = Company(
@@ -154,9 +166,16 @@ def student_profile():
         student.phone = data.get('phone', student.phone)
         student.skills = data.get('skills', student.skills)
         student.resume_url = data.get('resume_url', student.resume_url)
+        student.tenth_percentage = data.get('tenth_percentage', student.tenth_percentage)
+        student.twelfth_percentage = data.get('twelfth_percentage', student.twelfth_percentage)
+        student.experience = data.get('experience', student.experience)
+        student.projects = data.get('projects', student.projects)
+        student.certifications = data.get('certifications', student.certifications)
+        student.linkedin_url = data.get('linkedin_url', student.linkedin_url)
+        student.github_url = data.get('github_url', student.github_url)
         
         # Check profile completion
-        if all([student.full_name, student.phone, student.resume_url, student.skills]):
+        if all([student.full_name, student.phone, student.cgpa, student.skills]):
             student.profile_completed = True
         
         db.session.commit()
@@ -170,7 +189,7 @@ def student_profile():
 @app.route('/api/student/jobs', methods=['GET'])
 @jwt_required()
 def get_student_jobs():
-    """Get jobs eligible for the student"""
+    """Get all jobs with eligibility status for the student"""
     try:
         user_id = get_user_id()
         user = User.query.get(user_id)
@@ -179,15 +198,12 @@ def get_student_jobs():
             return jsonify({'error': 'Unauthorized'}), 403
         
         student = user.student
+        student_branch = student.branch.lower() if student.branch else ''
+        student_cgpa = student.cgpa or 0
         
-        # Get approved jobs that match student's eligibility
+        # Get ALL approved jobs
         jobs = Job.query.filter(
-            Job.status == 'Approved',
-            Job.min_cgpa <= student.cgpa,
-            or_(
-                Job.eligible_branches.like(f'%{student.branch}%'),
-                Job.eligible_branches == None
-            )
+            Job.status == 'Approved'
         ).order_by(Job.application_deadline.asc()).all()
         
         # Check which jobs student has already applied to
@@ -197,6 +213,66 @@ def get_student_jobs():
         for job in jobs:
             job_dict = job.to_dict()
             job_dict['has_applied'] = job.id in applied_job_ids
+            
+            # Check eligibility
+            is_eligible = True
+            eligibility_reasons = []
+            
+            # Check CGPA requirement
+            if job.min_cgpa and student_cgpa < job.min_cgpa:
+                is_eligible = False
+                eligibility_reasons.append(f"Min CGPA required: {job.min_cgpa} (Your CGPA: {student_cgpa})")
+            
+            # Check branch requirement
+            if job.eligible_branches:
+                branches_list = [b.strip().lower() for b in job.eligible_branches.split(',')]
+                student_branch_lower = student_branch.lower()
+                
+                # Flexible branch matching:
+                # 1. Exact match
+                # 2. Student branch contains any eligible branch
+                # 3. Any eligible branch contains student branch
+                # 4. Common abbreviations (IT = Information Technology, CS = Computer Science, ECE = Electronics)
+                branch_aliases = {
+                    'it': ['information technology', 'it', 'i.t.', 'i.t'],
+                    'cs': ['computer science', 'cs', 'c.s.', 'cse', 'computer science and engineering'],
+                    'ece': ['electronics', 'electronics and communication', 'ece', 'e.c.e.'],
+                    'ee': ['electrical', 'electrical engineering', 'ee', 'e.e.'],
+                    'me': ['mechanical', 'mechanical engineering', 'me', 'm.e.'],
+                    'ce': ['civil', 'civil engineering', 'ce', 'c.e.'],
+                }
+                
+                branch_match = False
+                
+                # Direct check
+                for eligible_branch in branches_list:
+                    if student_branch_lower == eligible_branch:
+                        branch_match = True
+                        break
+                    if student_branch_lower in eligible_branch or eligible_branch in student_branch_lower:
+                        branch_match = True
+                        break
+                
+                # Alias check if no direct match
+                if not branch_match:
+                    for alias_key, aliases in branch_aliases.items():
+                        # If student branch matches any alias
+                        student_in_alias = student_branch_lower in aliases or any(a in student_branch_lower for a in aliases)
+                        if student_in_alias:
+                            # Check if any eligible branch matches the same alias group
+                            for eligible_branch in branches_list:
+                                if eligible_branch in aliases or any(a in eligible_branch for a in aliases):
+                                    branch_match = True
+                                    break
+                        if branch_match:
+                            break
+                
+                if not branch_match:
+                    is_eligible = False
+                    eligibility_reasons.append(f"Branch not eligible. Required: {job.eligible_branches}")
+            
+            job_dict['is_eligible'] = is_eligible
+            job_dict['eligibility_reasons'] = eligibility_reasons
             jobs_data.append(job_dict)
         
         return jsonify(jobs_data), 200
@@ -268,6 +344,81 @@ def get_student_applications():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/student/company-visits', methods=['GET'])
+@jwt_required()
+def get_company_visits():
+    """Get upcoming company visits/drives"""
+    try:
+        user_id = get_user_id()
+        user = User.query.get(user_id)
+        
+        if user.role_id != 1:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        # Try to get from database, return empty list if table doesn't exist
+        try:
+            from models import CompanyVisit
+            visits = CompanyVisit.query.filter(
+                CompanyVisit.status.in_(['Scheduled', 'Ongoing'])
+            ).order_by(CompanyVisit.visit_date.asc()).all()
+            return jsonify([v.to_dict() for v in visits]), 200
+        except:
+            return jsonify([]), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/student/notifications', methods=['GET'])
+@jwt_required()
+def get_student_notifications():
+    """Get student's notifications"""
+    try:
+        user_id = get_user_id()
+        user = User.query.get(user_id)
+        
+        if user.role_id != 1:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        # Try to get from database, return empty list if table doesn't exist
+        try:
+            from models import Notification
+            notifications = Notification.query.filter_by(
+                student_id=user.student.id
+            ).order_by(Notification.created_at.desc()).limit(20).all()
+            return jsonify([n.to_dict() for n in notifications]), 200
+        except:
+            return jsonify([]), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/student/interview-experiences', methods=['GET'])
+@jwt_required()
+def get_interview_experiences():
+    """Get community shared interview experiences"""
+    try:
+        user_id = get_user_id()
+        user = User.query.get(user_id)
+        
+        if user.role_id != 1:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        # Try to get from database, return empty list if table doesn't exist
+        try:
+            from models import InterviewExperience
+            experiences = InterviewExperience.query.filter_by(
+                is_public=True
+            ).order_by(InterviewExperience.created_at.desc()).limit(20).all()
+            return jsonify([e.to_dict() for e in experiences]), 200
+        except:
+            return jsonify([]), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # ==================== Company Routes ====================
 
 @app.route('/api/company/profile', methods=['GET', 'PUT'])
@@ -321,19 +472,38 @@ def company_jobs():
             jobs = company.jobs
             return jsonify([job.to_dict() for job in jobs]), 200
         
-        # POST - Create new job
         data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'No job data provided'}), 400
+
+        required_fields = ['title', 'job_type', 'description', 'application_deadline']
+        missing = [f for f in required_fields if not data.get(f)]
+        if missing:
+            return jsonify({'error': f"Missing required fields: {', '.join(missing)}"}), 400
+
+        # Parse and validate deadline
+        deadline_str = data.get('application_deadline')
+        deadline_date = None
+        if deadline_str:
+            try:
+                deadline_date = datetime.strptime(deadline_str, '%Y-%m-%d').date()
+            except Exception:
+                return jsonify({'error': 'Invalid application_deadline format. Use YYYY-MM-DD'}), 400
+        if not deadline_date:
+            return jsonify({'error': 'application_deadline is required'}), 400
+
         job = Job(
             company_id=company.id,
-            title=data['title'],
-            job_type=data['job_type'],
-            description=data['description'],
+            title=data.get('title'),
+            job_type=data.get('job_type'),
+            description=data.get('description', ''),
             requirements=data.get('requirements', ''),
             location=data.get('location', ''),
             salary_range=data.get('salary_range', ''),
-            min_cgpa=data.get('min_cgpa', 0.0),
+            min_cgpa=float(data.get('min_cgpa', 0.0) or 0.0),
             eligible_branches=data.get('eligible_branches', ''),
-            application_deadline=data['application_deadline'],
+            application_deadline=deadline_date,
             status='Pending'  # Needs admin approval
         )
         db.session.add(job)

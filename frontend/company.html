@@ -137,12 +137,13 @@
     async function api(path, opts = {}) {
       const auth = getAuth();
       if (!auth) { window.location.href = 'index.html'; return; }
-      const headers = { 'Content-Type': 'application/json', ...opts.headers };
+      const isFormData = opts.body instanceof FormData;
+      const headers = isFormData ? { ...opts.headers } : { 'Content-Type': 'application/json', ...opts.headers };
       headers.Authorization = `Bearer ${auth.token}`;
       const resp = await fetch(`${API_BASE}${path}`, {
         method: opts.method || 'GET',
         headers,
-        body: opts.body ? JSON.stringify(opts.body) : undefined,
+        body: isFormData ? opts.body : (opts.body ? JSON.stringify(opts.body) : undefined),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'Request failed');
@@ -278,9 +279,9 @@
     const form = document.querySelector('#job-form');
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const data = new FormData(form);
-      const payload = Object.fromEntries(data.entries());
-      payload.min_cgpa = parseFloat(payload.min_cgpa || 0);
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+      payload.min_cgpa = parseFloat(payload.min_cgpa || '0') || 0;
       const btn = form.querySelector('button[type="submit"]');
       btn.disabled = true;
       btn.textContent = 'Posting...';

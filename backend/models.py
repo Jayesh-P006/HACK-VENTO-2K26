@@ -44,10 +44,20 @@ class Student(db.Model):
     enrollment_number = db.Column(db.String(50), unique=True, nullable=False)
     branch = db.Column(db.String(100), nullable=False)
     cgpa = db.Column(db.Numeric(3, 2), nullable=False)
+    tenth_percentage = db.Column(db.Numeric(5, 2))
+    twelfth_percentage = db.Column(db.Numeric(5, 2))
     graduation_year = db.Column(db.Integer, nullable=False)
     phone = db.Column(db.String(15))
     resume_url = db.Column(db.String(500))
+    ats_score = db.Column(db.Integer)  # ATS score 0-100
+    ats_feedback = db.Column(db.Text)  # Detailed ATS feedback from Gemini
+    ats_calculated_at = db.Column(db.DateTime)  # When ATS was last calculated
     skills = db.Column(db.Text)
+    experience = db.Column(db.Text)
+    projects = db.Column(db.Text)
+    certifications = db.Column(db.Text)
+    linkedin_url = db.Column(db.String(500))
+    github_url = db.Column(db.String(500))
     profile_completed = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
@@ -61,11 +71,21 @@ class Student(db.Model):
             'full_name': self.full_name,
             'enrollment_number': self.enrollment_number,
             'branch': self.branch,
-            'cgpa': float(self.cgpa),
+            'cgpa': float(self.cgpa) if self.cgpa else None,
+            'tenth_percentage': float(self.tenth_percentage) if self.tenth_percentage else None,
+            'twelfth_percentage': float(self.twelfth_percentage) if self.twelfth_percentage else None,
             'graduation_year': self.graduation_year,
             'phone': self.phone,
             'resume_url': self.resume_url,
+            'ats_score': self.ats_score,
+            'ats_feedback': self.ats_feedback,
+            'ats_calculated_at': self.ats_calculated_at.isoformat() if self.ats_calculated_at else None,
             'skills': self.skills,
+            'experience': self.experience,
+            'projects': self.projects,
+            'certifications': self.certifications,
+            'linkedin_url': self.linkedin_url,
+            'github_url': self.github_url,
             'profile_completed': self.profile_completed
         }
 
@@ -393,6 +413,7 @@ class StudentVerification(db.Model):
             'id': self.id,
             'student_id': self.student_id,
             'student_name': self.student.full_name if self.student else None,
+            'email': self.student.user.email if self.student and self.student.user else None,
             'enrollment_number': self.student.enrollment_number if self.student else None,
             'branch': self.student.branch if self.student else None,
             'status': self.status,

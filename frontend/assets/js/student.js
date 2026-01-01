@@ -136,4 +136,228 @@ function renderApplications() {
   animateStagger('#applications .card');
 }
 
+// ==================== Profile Management ====================
+const profileView = document.querySelector('#profile-view');
+const dashboardView = document.querySelector('#dashboard-view');
+const navDashboard = document.querySelector('#nav-dashboard');
+const navProfile = document.querySelector('#nav-profile');
+const editProfileBtn = document.querySelector('#edit-profile-btn');
+const saveProfileBtn = document.querySelector('#save-profile-btn');
+const cancelEditBtn = document.querySelector('#cancel-edit-btn');
+const uploadResumeBtn = document.querySelector('#upload-resume-btn');
+const resumeUploadInput = document.querySelector('#resume-upload');
+const profileForm = document.querySelector('#profile-form');
+
+let isEditing = false;
+let studentProfile = null;
+
+// Navigation between views
+navDashboard.addEventListener('click', (e) => {
+  e.preventDefault();
+  dashboardView.style.display = 'block';
+  profileView.style.display = 'none';
+  navDashboard.classList.add('active');
+  navProfile.classList.remove('active');
+});
+
+navProfile.addEventListener('click', (e) => {
+  e.preventDefault();
+  dashboardView.style.display = 'none';
+  profileView.style.display = 'block';
+  navDashboard.classList.remove('active');
+  navProfile.classList.add('active');
+  loadProfile();
+});
+
+// Load profile data
+async function loadProfile() {
+  try {
+    const profile = await api('/student/profile');
+    studentProfile = profile;
+    populateProfileForm(profile);
+    updateResumeStatus(profile.resume_url);
+  } catch (err) {
+    showToast('Failed to load profile: ' + err.message, 'error');
+  }
+}
+
+// Populate form with profile data
+function populateProfileForm(profile) {
+  document.querySelector('#full_name').value = profile.full_name || '';
+  document.querySelector('#enrollment_number').value = profile.enrollment_number || '';
+  document.querySelector('#phone').value = profile.phone || '';
+  document.querySelector('#branch').value = profile.branch || '';
+  document.querySelector('#cgpa').value = profile.cgpa || '';
+  document.querySelector('#graduation_year').value = profile.graduation_year || '';
+  document.querySelector('#tenth_percentage').value = profile.tenth_percentage || '';
+  document.querySelector('#twelfth_percentage').value = profile.twelfth_percentage || '';
+  document.querySelector('#linkedin_url').value = profile.linkedin_url || '';
+  document.querySelector('#github_url').value = profile.github_url || '';
+  document.querySelector('#skills').value = profile.skills || '';
+  document.querySelector('#experience').value = profile.experience || '';
+  document.querySelector('#projects').value = profile.projects || '';
+  document.querySelector('#certifications').value = profile.certifications || '';
+}
+
+// Update resume status display
+function updateResumeStatus(resumeUrl) {
+  const resumeStatus = document.querySelector('#resume-status');
+  const resumeLink = document.querySelector('#resume-link');
+  
+  if (resumeUrl) {
+    resumeStatus.textContent = '✅ Resume uploaded';
+    resumeStatus.style.color = '#10b981';
+    resumeLink.href = 'http://localhost:5000' + resumeUrl;
+    resumeLink.style.display = 'inline-block';
+  } else {
+    resumeStatus.textContent = 'No resume uploaded yet';
+    resumeStatus.style.color = '#6b7280';
+    resumeLink.style.display = 'none';
+    document.querySelector('#resume-parse-info').style.display = 'block';
+  }
+}
+
+// Edit profile
+editProfileBtn.addEventListener('click', () => {
+  isEditing = true;
+  enableFormInputs(true);
+  editProfileBtn.style.display = 'none';
+  saveProfileBtn.style.display = 'inline-block';
+  cancelEditBtn.style.display = 'inline-block';
+});
+
+// Cancel edit
+cancelEditBtn.addEventListener('click', () => {
+  isEditing = false;
+  enableFormInputs(false);
+  editProfileBtn.style.display = 'inline-block';
+  saveProfileBtn.style.display = 'none';
+  cancelEditBtn.style.display = 'none';
+  if (studentProfile) {
+    populateProfileForm(studentProfile);
+  }
+});
+
+// Enable/disable form inputs
+function enableFormInputs(enable) {
+  const inputs = profileForm.querySelectorAll('input, textarea');
+  inputs.forEach(input => {
+    if (input.id !== 'enrollment_number' && input.id !== 'branch' && input.id !== 'graduation_year') {
+      input.disabled = !enable;
+    }
+  });
+}
+
+// Save profile
+saveProfileBtn.addEventListener('click', async () => {
+  try {
+    const formData = {
+      full_name: document.querySelector('#full_name').value,
+      phone: document.querySelector('#phone').value,
+      cgpa: parseFloat(document.querySelector('#cgpa').value),
+      tenth_percentage: parseFloat(document.querySelector('#tenth_percentage').value) || null,
+      twelfth_percentage: parseFloat(document.querySelector('#twelfth_percentage').value) || null,
+      linkedin_url: document.querySelector('#linkedin_url').value,
+      github_url: document.querySelector('#github_url').value,
+      skills: document.querySelector('#skills').value,
+      experience: document.querySelector('#experience').value,
+      projects: document.querySelector('#projects').value,
+      certifications: document.querySelector('#certifications').value
+    };
+
+    const updated = await api('/student/profile', 'PUT', formData);
+    studentProfile = updated;
+    
+    isEditing = false;
+    enableFormInputs(false);
+    editProfileBtn.style.display = 'inline-block';
+    saveProfileBtn.style.display = 'none';
+    cancelEditBtn.style.display = 'none';
+    
+    showToast('Profile updated successfully!', 'success');
+  } catch (err) {
+    showToast('Failed to update profile: ' + err.message, 'error');
+  }
+});
+
+// Resume upload
+uploadResumeBtn.addEventListener('click', () => {
+  resumeUploadInput.click();
+});
+
+resumeUploadInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    uploadResumeBtn.disabled = true;
+    uploadResumeBtn.innerHTML = '<span>⏳ Uploading...</span>';
+
+    const formData = new FormData();
+    formData.append('resume', file);
+
+    const token = localStorage.getItem('token');
+    const response = await fetch('http://localhost:5000/api/student/upload-resume', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Upload failed');
+    }
+
+    const result = await response.json();
+    showToast(result.message, 'success');
+    
+    // Update resume status
+    updateResumeStatus(result.resume_url);
+    document.querySelector('#resume-parse-info').style.display = 'none';
+
+    // Auto-fill form with parsed data
+    if (result.parsed_data && Object.keys(result.parsed_data).length > 0) {
+      showToast('Auto-filling profile from resume...', 'info');
+      await autofillFromParsedData(result.parsed_data);
+    }
+
+    // Reload profile
+    await loadProfile();
+
+  } catch (err) {
+    showToast('Upload failed: ' + err.message, 'error');
+  } finally {
+    uploadResumeBtn.disabled = false;
+    uploadResumeBtn.innerHTML = '<span>📤 Upload Resume</span>';
+    resumeUploadInput.value = '';
+  }
+});
+
+// Auto-fill form from parsed resume data
+async function autofillFromParsedData(parsedData) {
+  const fieldsToUpdate = {};
+  
+  if (parsedData.phone) fieldsToUpdate.phone = parsedData.phone;
+  if (parsedData.cgpa) fieldsToUpdate.cgpa = parsedData.cgpa;
+  if (parsedData.tenth_percentage) fieldsToUpdate.tenth_percentage = parsedData.tenth_percentage;
+  if (parsedData.twelfth_percentage) fieldsToUpdate.twelfth_percentage = parsedData.twelfth_percentage;
+  if (parsedData.skills) fieldsToUpdate.skills = parsedData.skills;
+  if (parsedData.experience) fieldsToUpdate.experience = parsedData.experience;
+  if (parsedData.projects) fieldsToUpdate.projects = parsedData.projects;
+  if (parsedData.certifications) fieldsToUpdate.certifications = parsedData.certifications;
+  if (parsedData.linkedin_url) fieldsToUpdate.linkedin_url = parsedData.linkedin_url;
+  if (parsedData.github_url) fieldsToUpdate.github_url = parsedData.github_url;
+
+  if (Object.keys(fieldsToUpdate).length > 0) {
+    try {
+      await api('/student/profile', 'PUT', fieldsToUpdate);
+      showToast('Profile updated with resume data!', 'success');
+    } catch (err) {
+      console.error('Failed to auto-update profile:', err);
+    }
+  }
+}
+
 loadEverything();

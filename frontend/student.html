@@ -15,9 +15,8 @@
           <span data-greeting class="pill">Welcome</span>
         </div>
         <div class="nav" style="flex-wrap: wrap;">
-          <a href="student.html" class="active">Dashboard</a>
-          <a href="company.html" data-role-link="2">Company</a>
-          <a href="admin.html" data-role-link="3">Admin</a>
+          <a href="#dashboard" id="nav-dashboard" class="active">Dashboard</a>
+          <a href="#profile" id="nav-profile">My Profile</a>
         </div>
         <div class="user-badge">
           <div class="user-avatar" data-user-avatar>A</div>
@@ -29,19 +28,21 @@
         </div>
       </div>
 
-      <!-- DASHBOARD STATS SECTION -->
-      <section class="grid grid-4" id="stats"></section>
+      <!-- DASHBOARD VIEW -->
+      <div id="dashboard-view">
+        <!-- DASHBOARD STATS SECTION -->
+        <section class="grid grid-4" id="stats"></section>
 
-      <!-- NOTIFICATION CENTER WIDGET -->
-      <section class="grid grid-1" style="margin-top: 18px;">
-        <div class="grid" style="gap: 12px;">
-          <div class="section-title">
-            <h3>📢 Notifications</h3>
-            <button class="btn btn-ghost" id="refresh-notif" style="padding: 4px 10px; font-size: 12px;">Refresh</button>
+        <!-- NOTIFICATION CENTER WIDGET -->
+        <section class="grid grid-1" style="margin-top: 18px;">
+          <div class="grid" style="gap: 12px;">
+            <div class="section-title">
+              <h3>📢 Notifications</h3>
+              <button class="btn btn-ghost" id="refresh-notif" style="padding: 4px 10px; font-size: 12px;">Refresh</button>
+            </div>
+            <div id="notification-widget" style="grid-column: span 1;"></div>
           </div>
-          <div id="notification-widget" style="grid-column: span 1;"></div>
-        </div>
-      </section>
+        </section>
 
       <!-- LIVE DRIVE FEED WIDGET -->
       <section class="grid grid-1" style="margin-top: 18px;">
@@ -61,6 +62,21 @@
           <button class="btn btn-ghost" id="refresh-kanban" style="padding: 4px 10px; font-size: 12px;">Refresh</button>
         </div>
         <div id="kanban-widget" style="margin-top: 12px;"></div>
+      </section>
+
+      <!-- AVAILABLE JOBS SECTION -->
+      <section style="margin-top: 18px;">
+        <div class="section-title" style="flex-wrap: wrap; gap: 10px;">
+          <h3>🎯 Available Jobs - Apply Now</h3>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <div id="job-type-toggle" style="display: flex; gap: 6px;">
+              <button class="btn btn-primary job-filter-btn" data-job-filter="placement" aria-pressed="true" style="padding: 4px 10px; font-size: 12px;">Placement</button>
+              <button class="btn btn-ghost job-filter-btn" data-job-filter="internship" aria-pressed="false" style="padding: 4px 10px; font-size: 12px;">Internship</button>
+            </div>
+            <button class="btn btn-ghost" id="refresh-jobs" style="padding: 4px 10px; font-size: 12px;">Refresh</button>
+          </div>
+        </div>
+        <div id="jobs-container" class="grid" style="gap: 14px; margin-top: 12px;"></div>
       </section>
 
       <!-- RESUME SCORER WIDGET -->
@@ -107,6 +123,289 @@
         </div>
         <div id="applications" class="grid" style="gap: 14px;"></div>
       </section>
+      </div>
+      <!-- END DASHBOARD VIEW -->
+
+      <!-- PROFILE VIEW -->
+      <div id="profile-view" style="display: none;">
+        <section style="margin-top: 18px;">
+          <div class="section-title">
+            <h3>👤 My Profile</h3>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary" id="edit-profile-btn">Edit Profile</button>
+              <button class="btn btn-primary" id="save-profile-btn" style="display: none;">Save Changes</button>
+              <button class="btn btn-ghost" id="cancel-edit-btn" style="display: none;">Cancel</button>
+            </div>
+          </div>
+
+          <!-- Resume Upload Section -->
+          <div class="card" style="margin-top: 18px; padding: 20px;">
+            <h4>📄 Resume</h4>
+            <div style="margin-top: 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+              <input type="file" id="resume-upload" accept=".pdf,.doc,.docx" style="display: none;">
+              <button class="btn btn-primary" id="upload-resume-btn">
+                <span>📤 Upload Resume</span>
+              </button>
+              <button class="btn btn-ghost" id="delete-resume-btn" style="display: none;">
+                <span>🗑️ Delete Resume</span>
+              </button>
+              <span id="resume-status" class="minor"></span>
+              <a id="resume-link" href="#" target="_blank" style="display: none;" class="btn btn-ghost">View Current Resume</a>
+            </div>
+            <div id="resume-parse-info" style="margin-top: 12px; padding: 12px; background: #f0f7ff; border-radius: 8px; display: none;">
+              <p class="minor" style="margin: 0;">✨ Upload your resume (PDF format) to auto-fill profile details!</p>
+            </div>
+          </div>
+
+          <!-- ATS Score Section -->
+          <div class="card" style="margin-top: 18px; padding: 20px;" id="ats-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+              <h4>📊 ATS Score Analysis</h4>
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="file" id="ats-resume-file" accept=".pdf" style="display: none;">
+                <button class="btn btn-secondary" id="upload-ats-btn" style="background: #4b5563;">
+                  <span>📄 Quick Resume Analysis</span>
+                </button>
+                <button class="btn btn-primary" id="jd-analysis-btn" style="background: linear-gradient(135deg, #8b5cf6, #6366f1);">
+                  <span>🎯 Compare with Job Description</span>
+                </button>
+                <button class="btn btn-primary" id="calculate-ats-btn" style="display: none;">
+                  <span>🔍 Re-Analyze Profile Resume</span>
+                </button>
+              </div>
+            </div>
+            
+            <!-- JD Analysis Form (Hidden by default) -->
+            <div id="jd-analysis-form" style="display: none; margin-top: 16px; padding: 20px; background: rgba(139, 92, 246, 0.1); border-radius: 12px; border: 1px dashed #8b5cf6;">
+              <h5 style="margin: 0 0 16px 0; color: #8b5cf6;">🎯 Job Description Comparison</h5>
+              <p class="minor" style="margin-bottom: 16px;">Upload your resume and paste/upload a job description to see how well you match!</p>
+              
+              <div style="display: grid; gap: 16px;">
+                <!-- Resume Upload for JD Analysis -->
+                <div>
+                  <label class="form-label">Resume (PDF) *</label>
+                  <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="file" id="jd-resume-file" accept=".pdf" class="form-input" style="flex: 1;">
+                    <span id="jd-resume-status" class="minor"></span>
+                  </div>
+                  <p class="minor" style="margin-top: 4px;">Or leave empty to use your profile resume</p>
+                </div>
+                
+                <!-- JD Input Options -->
+                <div>
+                  <label class="form-label">Job Description *</label>
+                  <div style="margin-bottom: 10px;">
+                    <button type="button" class="btn btn-secondary btn-sm" id="jd-paste-tab" style="background: #6366f1; padding: 6px 12px; margin-right: 8px;">
+                      📝 Paste Text
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="jd-upload-tab" style="background: #4b5563; padding: 6px 12px;">
+                      📄 Upload PDF
+                    </button>
+                  </div>
+                  
+                  <!-- Paste JD Text -->
+                  <div id="jd-text-input" style="display: block;">
+                    <textarea id="jd-text" class="form-input" rows="6" placeholder="Paste the job description here...&#10;&#10;Example:&#10;We are looking for a Software Engineer with experience in Python, JavaScript, and cloud technologies. The ideal candidate should have..."></textarea>
+                  </div>
+                  
+                  <!-- Upload JD File -->
+                  <div id="jd-file-input" style="display: none;">
+                    <input type="file" id="jd-file" accept=".pdf,.txt" class="form-input">
+                    <p class="minor" style="margin-top: 4px;">Supports PDF and TXT files</p>
+                  </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                  <button type="button" class="btn btn-secondary" id="cancel-jd-btn" style="background: #4b5563;">
+                    Cancel
+                  </button>
+                  <button type="button" class="btn btn-primary" id="analyze-jd-btn" style="background: linear-gradient(135deg, #8b5cf6, #6366f1);">
+                    🚀 Analyze Match
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <!-- ATS Score Display -->
+            <div id="ats-content" style="margin-top: 16px;">
+              <div id="ats-placeholder" style="text-align: center; padding: 20px; color: #9ca3af;">
+                <p>📤 Upload a PDF resume to get your ATS score analyzed by AI</p>
+                <p class="minor" style="margin-top: 8px;">Or compare your resume with a specific Job Description for targeted analysis!</p>
+              </div>
+              
+              <!-- Loading Animation -->
+              <div id="ats-loading" style="display: none; text-align: center; padding: 30px;">
+                <div class="ats-loader" style="margin: 0 auto 20px;">
+                  <svg width="100" height="100" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="#2d3748" stroke-width="8"/>
+                    <circle id="ats-progress-circle" cx="50" cy="50" r="45" fill="none" stroke="#3b82f6" stroke-width="8" 
+                            stroke-dasharray="283" stroke-dashoffset="283" stroke-linecap="round"
+                            style="transform: rotate(-90deg); transform-origin: center; transition: stroke-dashoffset 0.5s ease;">
+                    </circle>
+                    <text id="ats-loading-text" x="50" y="55" text-anchor="middle" fill="#fff" font-size="18" font-weight="bold">0%</text>
+                  </svg>
+                </div>
+                <p style="color: #60a5fa; font-weight: 500;" id="ats-loading-title">🤖 AI is analyzing your resume...</p>
+                <p class="minor" id="ats-loading-status">Initializing analysis...</p>
+              </div>
+              
+              <!-- ATS Result -->
+              <div id="ats-result" style="display: none;">
+                <div style="display: flex; align-items: center; gap: 24px; flex-wrap: wrap;">
+                  <!-- Score Circle -->
+                  <div style="text-align: center;">
+                    <svg width="120" height="120" viewBox="0 0 120 120">
+                      <circle cx="60" cy="60" r="54" fill="none" stroke="#2d3748" stroke-width="10"/>
+                      <circle id="ats-score-circle" cx="60" cy="60" r="54" fill="none" stroke="#10b981" stroke-width="10" 
+                              stroke-dasharray="339" stroke-dashoffset="339" stroke-linecap="round"
+                              style="transform: rotate(-90deg); transform-origin: center; transition: stroke-dashoffset 1.5s ease-out;">
+                      </circle>
+                      <text id="ats-score-text" x="60" y="65" text-anchor="middle" fill="#fff" font-size="28" font-weight="bold">0</text>
+                    </svg>
+                    <p style="margin-top: 8px; font-weight: 600;" id="ats-score-label">ATS Score</p>
+                  </div>
+                  
+                  <!-- Score Summary -->
+                  <div style="flex: 1; min-width: 200px;">
+                    <p id="ats-overall" style="font-size: 14px; color: #d1d5db; margin-bottom: 12px;"></p>
+                    <p class="minor" id="ats-calculated-date"></p>
+                    <p class="minor" id="ats-analysis-type" style="color: #8b5cf6;"></p>
+                  </div>
+                </div>
+                
+                <!-- Detailed Feedback -->
+                <div style="margin-top: 20px; display: grid; gap: 16px;">
+                  <!-- Strengths -->
+                  <div id="ats-strengths" style="padding: 16px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; display: none;">
+                    <h5 style="margin: 0 0 8px 0; color: #10b981;">💪 Strengths</h5>
+                    <ul id="ats-strengths-list" style="margin: 0; padding-left: 20px; color: #d1d5db;"></ul>
+                  </div>
+                  
+                  <!-- Improvements -->
+                  <div id="ats-improvements" style="padding: 16px; background: rgba(245, 158, 11, 0.1); border-radius: 8px; display: none;">
+                    <h5 style="margin: 0 0 8px 0; color: #f59e0b;">🎯 Areas for Improvement</h5>
+                    <ul id="ats-improvements-list" style="margin: 0; padding-left: 20px; color: #d1d5db;"></ul>
+                  </div>
+                  
+                  <!-- Matching Keywords (for JD analysis) -->
+                  <div id="ats-matching-keywords" style="padding: 16px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; display: none;">
+                    <h5 style="margin: 0 0 8px 0; color: #10b981;">✅ Matching Keywords</h5>
+                    <div id="ats-matching-keywords-list" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+                  </div>
+                  
+                  <!-- Missing Keywords -->
+                  <div id="ats-keywords" style="padding: 16px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; display: none;">
+                    <h5 style="margin: 0 0 8px 0; color: #ef4444;">❌ Missing Keywords</h5>
+                    <div id="ats-keywords-list" style="display: flex; flex-wrap: wrap; gap: 8px;"></div>
+                  </div>
+                  
+                  <!-- Formatting Tips -->
+                  <div id="ats-formatting" style="padding: 16px; background: rgba(139, 92, 246, 0.1); border-radius: 8px; display: none;">
+                    <h5 style="margin: 0 0 8px 0; color: #8b5cf6;">📝 Formatting Tips</h5>
+                    <ul id="ats-formatting-list" style="margin: 0; padding-left: 20px; color: #d1d5db;"></ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Profile Form -->
+          <form id="profile-form" style="margin-top: 18px;">
+            <div class="card" style="padding: 20px;">
+              <h4>Basic Information</h4>
+              <div class="grid grid-2" style="gap: 16px; margin-top: 16px;">
+                <div>
+                  <label class="form-label">Full Name *</label>
+                  <input type="text" class="form-input" id="full_name" required disabled>
+                </div>
+                <div>
+                  <label class="form-label">Enrollment Number *</label>
+                  <input type="text" class="form-input" id="enrollment_number" disabled>
+                </div>
+                <div>
+                  <label class="form-label">Phone Number *</label>
+                  <input type="tel" class="form-input" id="phone" required disabled>
+                </div>
+                <div>
+                  <label class="form-label">Branch *</label>
+                  <input type="text" class="form-input" id="branch" disabled>
+                </div>
+                <div>
+                  <label class="form-label">CGPA *</label>
+                  <input type="number" step="0.01" min="0" max="10" class="form-input" id="cgpa" required disabled>
+                </div>
+                <div>
+                  <label class="form-label">Graduation Year *</label>
+                  <input type="number" class="form-input" id="graduation_year" disabled>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="padding: 20px; margin-top: 18px;">
+              <h4>Academic Details</h4>
+              <div class="grid grid-2" style="gap: 16px; margin-top: 16px;">
+                <div>
+                  <label class="form-label">10th Percentage</label>
+                  <input type="number" step="0.01" min="0" max="100" class="form-input" id="tenth_percentage" disabled>
+                </div>
+                <div>
+                  <label class="form-label">12th Percentage</label>
+                  <input type="number" step="0.01" min="0" max="100" class="form-input" id="twelfth_percentage" disabled>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="padding: 20px; margin-top: 18px;">
+              <h4>Professional Links</h4>
+              <div class="grid grid-2" style="gap: 16px; margin-top: 16px;">
+                <div>
+                  <label class="form-label">LinkedIn URL</label>
+                  <input type="url" class="form-input" id="linkedin_url" placeholder="https://linkedin.com/in/username" disabled>
+                </div>
+                <div>
+                  <label class="form-label">GitHub URL</label>
+                  <input type="url" class="form-input" id="github_url" placeholder="https://github.com/username" disabled>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="padding: 20px; margin-top: 18px;">
+              <h4>Skills</h4>
+              <div style="margin-top: 16px;">
+                <label class="form-label">Technical Skills (comma-separated)</label>
+                <textarea class="form-input" id="skills" rows="3" placeholder="Python, JavaScript, React, Node.js, SQL..." disabled></textarea>
+              </div>
+            </div>
+
+            <div class="card" style="padding: 20px; margin-top: 18px;">
+              <h4>Experience</h4>
+              <div style="margin-top: 16px;">
+                <label class="form-label">Work Experience / Internships</label>
+                <textarea class="form-input" id="experience" rows="4" placeholder="Describe your work experience, internships..." disabled></textarea>
+              </div>
+            </div>
+
+            <div class="card" style="padding: 20px; margin-top: 18px;">
+              <h4>Projects</h4>
+              <div style="margin-top: 16px;">
+                <label class="form-label">Academic / Personal Projects</label>
+                <textarea class="form-input" id="projects" rows="4" placeholder="Describe your projects..." disabled></textarea>
+              </div>
+            </div>
+
+            <div class="card" style="padding: 20px; margin-top: 18px;">
+              <h4>Certifications</h4>
+              <div style="margin-top: 16px;">
+                <label class="form-label">Certifications & Achievements</label>
+                <textarea class="form-input" id="certifications" rows="3" placeholder="List your certifications, courses, achievements..." disabled></textarea>
+              </div>
+            </div>
+          </form>
+        </section>
+      </div>
+      <!-- END PROFILE VIEW -->
+
     </div>
   </main>
   <script src="assets/js/dashboard-widgets.js"></script>
@@ -138,22 +437,78 @@
       window.location.href = 'index.html';
     });
 
-    // Initialize dashboard manager
-    const manager = new DashboardManager(auth);
+    // API helper function
+    async function apiCall(endpoint, method = 'GET', body = null) {
+      try {
+        const options = {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${auth.token}`
+          }
+        };
+        if (body) options.body = JSON.stringify(body);
+        
+        const response = await fetch(`http://localhost:5000/api${endpoint}`, options);
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Request failed');
+        }
+        return await response.json();
+      } catch (err) {
+        console.error('API Error:', err);
+        throw err;
+      }
+    }
 
-    // Initialize all widgets
-    const driveFeed = new DriveFeedWidget('#drive-feed-widget', manager);
-    const kanban = new KanbanBoardWidget('#kanban-widget', manager);
-    const notifications = new NotificationCenterWidget('#notification-widget', manager);
-    const interviewRepo = new InterviewRepositoryWidget('#interview-repo-widget', manager);
-    const resumeScorer = new ResumeScorlerWidget('#resume-scorer-widget', manager);
-    const skillGap = new SkillGapVisualizerWidget('#skill-gap-widget', manager);
+    // Show toast notification
+    function showToast(message, type = 'info') {
+      console.log(`[${type.toUpperCase()}] ${message}`);
+      alert(message); // Simple alert for now
+    }
 
-    // Register widgets with manager
-    manager.registerWidget('driveFeed', driveFeed);
-    manager.registerWidget('kanbanBoard', kanban);
-    manager.registerWidget('notificationCenter', notifications);
-    manager.registerWidget('interviewRepo', interviewRepo);
+    // Initialize dashboard manager (simplified)
+    const manager = {
+      api: apiCall,
+      showToast: showToast
+    };
+
+    // Initialize widgets (declare outside to make them accessible)
+    let dashManager, driveFeed, kanban, notifications, interviewRepo;
+    let jobsCache = [];
+    let applicationsCache = [];
+    let jobFilter = 'placement';
+    try {
+      if (typeof DashboardManager !== 'undefined') {
+        dashManager = new DashboardManager(auth);
+        driveFeed = new DriveFeedWidget('#drive-feed-widget', dashManager);
+        kanban = new KanbanBoardWidget('#kanban-widget', dashManager);
+        notifications = new NotificationCenterWidget('#notification-widget', dashManager);
+        interviewRepo = new InterviewRepositoryWidget('#interview-repo-widget', dashManager);
+        
+        dashManager.registerWidget('driveFeed', driveFeed);
+        dashManager.registerWidget('kanbanBoard', kanban);
+        dashManager.registerWidget('notificationCenter', notifications);
+        dashManager.registerWidget('interviewRepo', interviewRepo);
+      }
+    } catch (err) {
+      console.error('Widget initialization error:', err);
+    }
+
+    function setJobFilter(filter) {
+      jobFilter = filter;
+      document.querySelectorAll('[data-job-filter]').forEach(btn => {
+        const isActive = btn.dataset.jobFilter === filter;
+        btn.classList.toggle('btn-primary', isActive);
+        btn.classList.toggle('btn-ghost', !isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+      renderJobs();
+    }
+
+    document.querySelectorAll('[data-job-filter]').forEach(btn => {
+      btn.addEventListener('click', () => setJobFilter(btn.dataset.jobFilter));
+    });
 
     // Load dashboard data
     async function loadDashboard() {
@@ -166,11 +521,14 @@
           manager.api('/student/applications'),
         ]);
 
-        const jobs = jobsRes || [];
-        const applications = appsRes || [];
+        jobsCache = jobsRes || [];
+        applicationsCache = appsRes || [];
 
-        // Render stats
-        const eligible = jobs.filter(j => !j.has_applied).length;
+        const jobs = jobsCache;
+        const applications = applicationsCache;
+
+        // Render stats - count only jobs that student is actually eligible for
+        const eligible = jobs.filter(j => j.is_eligible !== false && !j.has_applied).length;
         const applied = applications.length;
         const shortlisted = applications.filter(a => a.status === 'Shortlisted' || a.status === 'Interview').length;
         const selected = applications.filter(a => a.status === 'Selected').length;
@@ -182,98 +540,961 @@
           <div class="card animate"><p class="minor">Selected</p><h2>${selected}</h2></div>
         `;
 
-        // Load widgets with mock data (in production, fetch from API)
-        const mockVisits = [
-          {
-            id: 1,
-            company_name: 'TechCorp Solutions',
-            recruitment_type: 'On-Campus Recruitment',
-            visit_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            visit_time: '10:00 AM',
-            location: 'Main Campus',
-            description: 'Annual recruitment drive for software engineers',
-            expected_ctc_range: '8-12 LPA',
-            eligibility_criteria: 'JavaScript, React, Node.js, 7+ CGPA',
-          },
-          {
-            id: 2,
-            company_name: 'CloudInnovate Inc',
-            recruitment_type: 'Virtual Hiring',
-            visit_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-            visit_time: '2:00 PM',
-            location: 'Online',
-            description: 'Internship and full-time positions for cloud engineers',
-            expected_ctc_range: '10-15 LPA',
-            eligibility_criteria: 'Python, AWS, Docker, 7.5+ CGPA',
-          },
-        ];
+        // Fetch real data from API (empty arrays if no data)
+        let companyVisits = [];
+        let userNotifications = [];
+        let interviewExperiences = [];
 
-        const mockNotifications = [
-          {
-            id: 1,
-            title: 'Interview Scheduled',
-            message: 'Your interview for SDE position at TechCorp is scheduled on March 15, 2025 at 10 AM',
-            type: 'interview_schedule',
-            priority: 'high',
-            created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 2,
-            title: 'Application Update',
-            message: 'Your application for Sr. Developer at CloudInnovate has been moved to Shortlist',
-            type: 'application_update',
-            priority: 'medium',
-            created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-          },
-        ];
+        // Try to fetch company visits
+        try {
+          const visitsRes = await manager.api('/student/company-visits');
+          companyVisits = visitsRes || [];
+        } catch (e) {
+          console.log('No company visits available');
+        }
 
-        const mockInterviews = [
-          {
-            id: 1,
-            company_name: 'TechCorp',
-            interview_type: 'Technical',
-            interview_round: 1,
-            difficulty_level: 'Medium',
-            outcome: 'Passed',
-            rating: 4,
-            topics_covered: 'JavaScript, React, OOP, System Design',
-            experience_summary: 'Great experience. Panel was friendly and asked practical questions about React hooks.',
-          },
-          {
-            id: 2,
-            company_name: 'StartupXYZ',
-            interview_type: 'HR Round',
-            interview_round: 2,
-            difficulty_level: 'Easy',
-            outcome: 'Passed',
-            rating: 5,
-            topics_covered: 'Career goals, team fit, salary expectations',
-            experience_summary: 'Smooth HR round. They discussed company culture and growth opportunities.',
-          },
-        ];
+        // Try to fetch notifications
+        try {
+          const notifRes = await manager.api('/student/notifications');
+          userNotifications = notifRes || [];
+        } catch (e) {
+          console.log('No notifications available');
+        }
 
-        // Render all widgets
-        await driveFeed.render(mockVisits);
-        await kanban.render(applications);
-        await notifications.render(mockNotifications);
-        await interviewRepo.render(mockInterviews);
-        resumeScorer.render();
-        skillGap.render();
+        // Try to fetch interview experiences (community shared)
+        try {
+          const interviewRes = await manager.api('/student/interview-experiences');
+          interviewExperiences = interviewRes || [];
+        } catch (e) {
+          console.log('No interview experiences available');
+        }
 
-        manager.showToast('Dashboard loaded successfully', 'success');
+        // Render all widgets with real data (only if they exist)
+        try {
+          if (driveFeed) await driveFeed.render(companyVisits);
+          if (kanban) await kanban.render(applications);
+          if (notifications) await notifications.render(userNotifications);
+          if (interviewRepo) await interviewRepo.render(interviewExperiences);
+        } catch (widgetError) {
+          console.error('Widget render error:', widgetError);
+        }
+
+        // Render available jobs
+        renderJobs();
+
+        showToast('Dashboard loaded successfully', 'success');
       } catch (err) {
         console.error('Dashboard load error:', err);
-        manager.showToast(err.message, 'error');
+        showToast('Error loading dashboard: ' + err.message, 'error');
+      }
+    }
+
+    // Render available jobs
+    function renderJobs() {
+      const jobsContainer = document.querySelector('#jobs-container');
+      if (!jobsContainer) return;
+
+      const appliedJobIds = applicationsCache.map(a => a.job_id);
+      const filteredJobs = jobsCache.filter(job => {
+        if (jobFilter === 'internship') {
+          return (job.job_type || '').toLowerCase() === 'internship';
+        }
+        return (job.job_type || '').toLowerCase() !== 'internship';
+      });
+      const visibleJobs = filteredJobs.filter(j => !appliedJobIds.includes(j.id));
+      const filterLabel = jobFilter === 'internship' ? 'Internship' : 'Placement';
+
+      if (visibleJobs.length === 0) {
+        jobsContainer.innerHTML = `
+          <div class="card" style="padding: 24px; text-align: center; color: #9ca3af;">
+            <p>No ${filterLabel.toLowerCase()} jobs available right now.</p>
+            <p class="minor">Try refreshing or switch the filter.</p>
+          </div>
+        `;
+        return;
+      }
+
+      jobsContainer.innerHTML = visibleJobs.map(job => {
+        const isEligible = job.is_eligible !== false;
+        // Deadline badge styling
+        let deadlineBadge = '';
+        if (job.application_deadline) {
+          const deadlineDate = new Date(job.application_deadline);
+          const now = new Date();
+          const diffDays = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
+          let badgeColor = '#3b82f6';
+          let label = `⏳ Deadline: ${deadlineDate.toLocaleDateString()}`;
+          if (diffDays <= 0) {
+            badgeColor = '#ef4444';
+            label = '⛔ Deadline passed';
+          } else if (diffDays <= 2) {
+            badgeColor = '#f59e0b';
+            label = `⚠️ Deadline in ${diffDays} day${diffDays === 1 ? '' : 's'}`;
+          } else if (diffDays <= 7) {
+            badgeColor = '#8b5cf6';
+            label = `🗓️ Deadline in ${diffDays} days`;
+          }
+          deadlineBadge = `<span class="badge" style="background: ${badgeColor}; color: white;">${label}</span>`;
+        }
+
+        const eligibilityTag = isEligible 
+          ? '<span class="badge" style="background: #10b981; color: white;">✅ Eligible</span>'
+          : '<span class="badge" style="background: #ef4444; color: white;">❌ Not Eligible</span>';
+        
+        const applyButton = isEligible
+          ? `<button class="btn btn-primary apply-btn" data-job-id="${job.id}" style="white-space: nowrap;">Apply Now</button>`
+          : `<button class="btn" style="white-space: nowrap; opacity: 0.5; cursor: not-allowed;" disabled title="${(job.eligibility_reasons || []).join(', ')}">Not Eligible</button>`;
+        
+        const reasonsHtml = !isEligible && job.eligibility_reasons && job.eligibility_reasons.length > 0
+          ? `<div style="margin-top: 8px; padding: 8px; background: rgba(239, 68, 68, 0.1); border-radius: 6px; font-size: 12px; color: #f87171;">
+              ${job.eligibility_reasons.map(r => `<p style="margin: 2px 0;">⚠️ ${r}</p>`).join('')}
+             </div>`
+          : '';
+
+        return `
+          <div class="card" style="padding: 16px; ${!isEligible ? 'opacity: 0.7;' : ''}">
+            <div style="display: flex; justify-content: space-between; align-items: start; gap: 16px;">
+              <div style="flex: 1;">
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px;">
+                  <h4 style="margin: 0;">${job.title}</h4>
+                  ${eligibilityTag}
+                  ${deadlineBadge}
+                </div>
+                <p class="minor" style="margin: 0 0 8px 0;">🏢 ${job.company_name || 'Company'}</p>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+                  ${job.package_lpa ? `<span class="badge badge-green">💰 ${job.package_lpa} LPA</span>` : ''}
+                  ${job.job_type ? `<span class="badge badge-blue">${job.job_type}</span>` : ''}
+                  ${job.location ? `<span class="badge badge-amber">📍 ${job.location}</span>` : ''}
+                </div>
+                ${job.description ? `<p style="margin: 0 0 12px 0; font-size: 14px; color: #d1d5db;">${job.description.substring(0, 150)}${job.description.length > 150 ? '...' : ''}</p>` : ''}
+                ${job.skills_required ? `<p style="margin: 0; font-size: 12px; color: #9ca3af;">Skills: ${job.skills_required}</p>` : ''}
+                ${job.min_cgpa ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: #9ca3af;">Min CGPA: ${job.min_cgpa}</p>` : ''}
+                ${job.eligible_branches ? `<p style="margin: 4px 0 0 0; font-size: 12px; color: #9ca3af;">Eligible Branches: ${job.eligible_branches}</p>` : ''}
+                ${reasonsHtml}
+              </div>
+              ${applyButton}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Add event listeners for apply buttons
+      jobsContainer.querySelectorAll('.apply-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const jobId = e.target.dataset.jobId;
+          await applyForJob(jobId);
+        });
+      });
+    }
+
+    // Apply for a job
+    async function applyForJob(jobId) {
+      try {
+        const result = await manager.api(`/student/apply/${jobId}`, 'POST');
+        manager.showToast('Application submitted successfully!', 'success');
+        // Reload dashboard to update stats and job list
+        await loadDashboard();
+      } catch (err) {
+        manager.showToast('Failed to apply: ' + err.message, 'error');
       }
     }
 
     // Refresh button handlers
-    document.querySelector('#refresh-drives')?.addEventListener('click', loadDashboard);
-    document.querySelector('#refresh-kanban')?.addEventListener('click', loadDashboard);
-    document.querySelector('#refresh-notif')?.addEventListener('click', loadDashboard);
+    document.querySelector('#refresh-drives')?.addEventListener('click', () => {
+      loadDashboard().catch(err => console.error(err));
+    });
+    document.querySelector('#refresh-kanban')?.addEventListener('click', () => {
+      loadDashboard().catch(err => console.error(err));
+    });
+    document.querySelector('#refresh-notif')?.addEventListener('click', () => {
+      loadDashboard().catch(err => console.error(err));
+    });
+    document.querySelector('#refresh-jobs')?.addEventListener('click', () => {
+      loadDashboard().catch(err => console.error(err));
+    });
+
+    // ==================== Profile Management ====================
+    const profileView = document.querySelector('#profile-view');
+    const dashboardView = document.querySelector('#dashboard-view');
+    const navDashboard = document.querySelector('#nav-dashboard');
+    const navProfile = document.querySelector('#nav-profile');
+    const editProfileBtn = document.querySelector('#edit-profile-btn');
+    const saveProfileBtn = document.querySelector('#save-profile-btn');
+    const cancelEditBtn = document.querySelector('#cancel-edit-btn');
+    const uploadResumeBtn = document.querySelector('#upload-resume-btn');
+    const resumeUploadInput = document.querySelector('#resume-upload');
+    const profileForm = document.querySelector('#profile-form');
+
+    let isEditing = false;
+    let studentProfile = null;
+
+    // Navigation between views
+    navDashboard.addEventListener('click', (e) => {
+      e.preventDefault();
+      dashboardView.style.display = 'block';
+      profileView.style.display = 'none';
+      navDashboard.classList.add('active');
+      navProfile.classList.remove('active');
+    });
+
+    navProfile.addEventListener('click', (e) => {
+      e.preventDefault();
+      dashboardView.style.display = 'none';
+      profileView.style.display = 'block';
+      navDashboard.classList.remove('active');
+      navProfile.classList.add('active');
+      loadProfile();
+    });
+
+    // Load profile data
+    async function loadProfile() {
+      try {
+        const profile = await manager.api('/student/profile');
+        studentProfile = profile;
+        populateProfileForm(profile);
+        updateResumeStatus(profile.resume_url);
+        updateATSDisplay(profile);
+      } catch (err) {
+        manager.showToast('Failed to load profile: ' + err.message, 'error');
+      }
+    }
+
+    // Populate form with profile data
+    function populateProfileForm(profile) {
+      document.querySelector('#full_name').value = profile.full_name || '';
+      document.querySelector('#enrollment_number').value = profile.enrollment_number || '';
+      document.querySelector('#phone').value = profile.phone || '';
+      document.querySelector('#branch').value = profile.branch || '';
+      document.querySelector('#cgpa').value = profile.cgpa || '';
+      document.querySelector('#graduation_year').value = profile.graduation_year || '';
+      document.querySelector('#tenth_percentage').value = profile.tenth_percentage || '';
+      document.querySelector('#twelfth_percentage').value = profile.twelfth_percentage || '';
+      document.querySelector('#linkedin_url').value = profile.linkedin_url || '';
+      document.querySelector('#github_url').value = profile.github_url || '';
+      document.querySelector('#skills').value = profile.skills || '';
+      document.querySelector('#experience').value = profile.experience || '';
+      document.querySelector('#projects').value = profile.projects || '';
+      document.querySelector('#certifications').value = profile.certifications || '';
+    }
+
+    // Update resume status display
+    function updateResumeStatus(resumeUrl) {
+      const resumeStatus = document.querySelector('#resume-status');
+      const resumeLink = document.querySelector('#resume-link');
+      const deleteResumeBtn = document.querySelector('#delete-resume-btn');
+      const calculateAtsBtn = document.querySelector('#calculate-ats-btn');
+      
+      if (resumeUrl) {
+        resumeStatus.textContent = '✅ Resume uploaded';
+        resumeStatus.style.color = '#10b981';
+        resumeLink.href = 'http://localhost:5000' + resumeUrl;
+        resumeLink.style.display = 'inline-block';
+        deleteResumeBtn.style.display = 'inline-block';
+        calculateAtsBtn.style.display = 'inline-block';
+        document.querySelector('#resume-parse-info').style.display = 'none';
+        document.querySelector('#ats-placeholder').style.display = 'none';
+      } else {
+        resumeStatus.textContent = 'No resume uploaded yet';
+        resumeStatus.style.color = '#6b7280';
+        resumeLink.style.display = 'none';
+        deleteResumeBtn.style.display = 'none';
+        calculateAtsBtn.style.display = 'none';
+        document.querySelector('#resume-parse-info').style.display = 'block';
+        document.querySelector('#ats-placeholder').style.display = 'block';
+        document.querySelector('#ats-result').style.display = 'none';
+      }
+    }
+
+    // Update ATS Display
+    function updateATSDisplay(profile) {
+      const atsResult = document.querySelector('#ats-result');
+      const atsPlaceholder = document.querySelector('#ats-placeholder');
+      
+      if (profile.ats_score !== null && profile.ats_score !== undefined) {
+        atsPlaceholder.style.display = 'none';
+        atsResult.style.display = 'block';
+        
+        // Animate score
+        animateATSScore(profile.ats_score);
+        
+        // Display feedback
+        if (profile.ats_feedback) {
+          try {
+            const feedback = typeof profile.ats_feedback === 'string' 
+              ? JSON.parse(profile.ats_feedback) 
+              : profile.ats_feedback;
+            displayATSFeedback(feedback);
+          } catch (e) {
+            console.error('Error parsing ATS feedback:', e);
+          }
+        }
+        
+        // Show calculated date
+        if (profile.ats_calculated_at) {
+          const date = new Date(profile.ats_calculated_at);
+          document.querySelector('#ats-calculated-date').textContent = 
+            `Last analyzed: ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+        }
+      } else if (profile.resume_url) {
+        atsPlaceholder.innerHTML = '<p>Click "Analyze Resume" to get your ATS score</p>';
+      }
+    }
+
+    // Animate ATS Score
+    function animateATSScore(score) {
+      const circle = document.querySelector('#ats-score-circle');
+      const text = document.querySelector('#ats-score-text');
+      const label = document.querySelector('#ats-score-label');
+      
+      // Set color based on score
+      let color = '#ef4444'; // Red
+      let labelText = 'Needs Improvement';
+      if (score >= 80) {
+        color = '#10b981'; // Green
+        labelText = 'Excellent';
+      } else if (score >= 60) {
+        color = '#3b82f6'; // Blue
+        labelText = 'Good';
+      } else if (score >= 40) {
+        color = '#f59e0b'; // Amber
+        labelText = 'Fair';
+      }
+      
+      circle.style.stroke = color;
+      label.textContent = labelText;
+      label.style.color = color;
+      
+      // Animate circle
+      const circumference = 339; // 2 * PI * 54
+      const offset = circumference - (score / 100) * circumference;
+      
+      setTimeout(() => {
+        circle.style.strokeDashoffset = offset;
+      }, 100);
+      
+      // Animate number
+      let current = 0;
+      const duration = 1500;
+      const step = score / (duration / 16);
+      const interval = setInterval(() => {
+        current += step;
+        if (current >= score) {
+          current = score;
+          clearInterval(interval);
+        }
+        text.textContent = Math.round(current);
+      }, 16);
+    }
+
+    // Display ATS Feedback
+    function displayATSFeedback(feedback) {
+      // Overall
+      if (feedback.overall) {
+        document.querySelector('#ats-overall').textContent = feedback.overall;
+      }
+      
+      // Strengths
+      if (feedback.strengths && feedback.strengths.length > 0) {
+        const strengthsSection = document.querySelector('#ats-strengths');
+        const strengthsList = document.querySelector('#ats-strengths-list');
+        strengthsList.innerHTML = feedback.strengths.map(s => `<li>${s}</li>`).join('');
+        strengthsSection.style.display = 'block';
+      }
+      
+      // Improvements
+      if (feedback.improvements && feedback.improvements.length > 0) {
+        const improvementsSection = document.querySelector('#ats-improvements');
+        const improvementsList = document.querySelector('#ats-improvements-list');
+        improvementsList.innerHTML = feedback.improvements.map(s => `<li>${s}</li>`).join('');
+        improvementsSection.style.display = 'block';
+      }
+      
+      // Missing Keywords
+      if (feedback.missing_keywords && feedback.missing_keywords.length > 0) {
+        const keywordsSection = document.querySelector('#ats-keywords');
+        const keywordsList = document.querySelector('#ats-keywords-list');
+        keywordsList.innerHTML = feedback.missing_keywords.map(k => 
+          `<span class="badge" style="background: #3b82f6; color: white;">${k}</span>`
+        ).join('');
+        keywordsSection.style.display = 'block';
+      }
+      
+      // Formatting Tips
+      if (feedback.formatting_tips && feedback.formatting_tips.length > 0) {
+        const formattingSection = document.querySelector('#ats-formatting');
+        const formattingList = document.querySelector('#ats-formatting-list');
+        formattingList.innerHTML = feedback.formatting_tips.map(s => `<li>${s}</li>`).join('');
+        formattingSection.style.display = 'block';
+      }
+    }
+
+    // Calculate ATS Score with animation (for profile resume)
+    async function calculateATSScore() {
+      await runATSAnalysis('/student/calculate-ats', null);
+    }
+    
+    // Upload and analyze resume for ATS
+    async function uploadAndAnalyzeATS(file) {
+      const formData = new FormData();
+      formData.append('resume', file);
+      await runATSAnalysis('/student/analyze-resume-upload', formData);
+    }
+    
+    // Common ATS analysis function
+    async function runATSAnalysis(endpoint, formData) {
+      const loadingDiv = document.querySelector('#ats-loading');
+      const resultDiv = document.querySelector('#ats-result');
+      const placeholderDiv = document.querySelector('#ats-placeholder');
+      const progressCircle = document.querySelector('#ats-progress-circle');
+      const loadingText = document.querySelector('#ats-loading-text');
+      const loadingStatus = document.querySelector('#ats-loading-status');
+      const calculateBtn = document.querySelector('#calculate-ats-btn');
+      const uploadBtn = document.querySelector('#upload-ats-btn');
+      
+      // Hide other elements and show loading
+      placeholderDiv.style.display = 'none';
+      resultDiv.style.display = 'none';
+      loadingDiv.style.display = 'block';
+      calculateBtn.disabled = true;
+      uploadBtn.disabled = true;
+      uploadBtn.innerHTML = '<span>⏳ Analyzing...</span>';
+      
+      // Reset loading animation
+      progressCircle.style.strokeDashoffset = 283;
+      loadingText.textContent = '0%';
+      
+      // Simulate progress animation
+      const statusMessages = [
+        'Initializing AI analysis...',
+        'Extracting resume content...',
+        'Analyzing keyword density...',
+        'Evaluating format structure...',
+        'Checking ATS compatibility...',
+        'Generating recommendations...',
+        'Finalizing score...'
+      ];
+      
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress > 90) progress = 90; // Cap at 90% until API responds
+        
+        const offset = 283 - (progress / 100) * 283;
+        progressCircle.style.strokeDashoffset = offset;
+        loadingText.textContent = Math.round(progress) + '%';
+        
+        const messageIndex = Math.min(Math.floor(progress / 15), statusMessages.length - 1);
+        loadingStatus.textContent = statusMessages[messageIndex];
+      }, 300);
+      
+      try {
+        let response;
+        if (formData) {
+          // Direct file upload
+          const token = localStorage.getItem('token');
+          const fetchResponse = await fetch(`http://localhost:5000${endpoint}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
+            body: formData
+          });
+          response = await fetchResponse.json();
+        } else {
+          // Use existing profile resume
+          response = await manager.api(endpoint, 'POST');
+        }
+        
+        clearInterval(progressInterval);
+        
+        // Complete the progress animation
+        progressCircle.style.strokeDashoffset = 0;
+        loadingText.textContent = '100%';
+        loadingStatus.textContent = 'Analysis complete!';
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        loadingDiv.style.display = 'none';
+        
+        if (response.success) {
+          resultDiv.style.display = 'block';
+          animateATSScore(response.ats_score);
+          displayATSFeedbackWithJD(response.ats_feedback, false);
+          
+          document.querySelector('#ats-calculated-date').textContent = 
+            `Last analyzed: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+          
+          manager.showToast(`ATS Score: ${response.ats_score}/100`, 'success');
+        } else {
+          placeholderDiv.innerHTML = `<p style="color: #f87171;">⚠️ ${response.error || 'Failed to calculate ATS score'}</p>`;
+          placeholderDiv.style.display = 'block';
+        }
+        
+      } catch (err) {
+        clearInterval(progressInterval);
+        loadingDiv.style.display = 'none';
+        placeholderDiv.innerHTML = `<p style="color: #f87171;">⚠️ Error: ${err.message}</p>`;
+        placeholderDiv.style.display = 'block';
+        manager.showToast('Failed to calculate ATS score: ' + err.message, 'error');
+      } finally {
+        calculateBtn.disabled = false;
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = '<span>📄 Quick Resume Analysis</span>';
+      }
+    }
+
+    // ATS file upload button handler
+    document.querySelector('#upload-ats-btn')?.addEventListener('click', () => {
+      document.querySelector('#ats-resume-file').click();
+    });
+    
+    // ATS file input change handler
+    document.querySelector('#ats-resume-file')?.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (!file.name.toLowerCase().endsWith('.pdf')) {
+          manager.showToast('Please upload a PDF file', 'error');
+          return;
+        }
+        uploadAndAnalyzeATS(file);
+        e.target.value = ''; // Reset input for future uploads
+      }
+    });
+
+    // Calculate ATS button handler (for profile resume)
+    document.querySelector('#calculate-ats-btn')?.addEventListener('click', calculateATSScore);
+
+    // ============ JD ANALYSIS FUNCTIONALITY ============
+    
+    // Toggle JD analysis form
+    document.querySelector('#jd-analysis-btn')?.addEventListener('click', () => {
+      const jdForm = document.querySelector('#jd-analysis-form');
+      const atsContent = document.querySelector('#ats-content');
+      
+      if (jdForm.style.display === 'none') {
+        jdForm.style.display = 'block';
+        atsContent.style.display = 'none';
+      } else {
+        jdForm.style.display = 'none';
+        atsContent.style.display = 'block';
+      }
+    });
+    
+    // Cancel JD analysis
+    document.querySelector('#cancel-jd-btn')?.addEventListener('click', () => {
+      document.querySelector('#jd-analysis-form').style.display = 'none';
+      document.querySelector('#ats-content').style.display = 'block';
+      // Reset form
+      document.querySelector('#jd-resume-file').value = '';
+      document.querySelector('#jd-text').value = '';
+      document.querySelector('#jd-file').value = '';
+    });
+    
+    // JD input tabs (Text vs Upload)
+    document.querySelector('#jd-paste-tab')?.addEventListener('click', () => {
+      document.querySelector('#jd-paste-tab').style.background = '#6366f1';
+      document.querySelector('#jd-upload-tab').style.background = '#4b5563';
+      document.querySelector('#jd-text-input').style.display = 'block';
+      document.querySelector('#jd-file-input').style.display = 'none';
+    });
+    
+    document.querySelector('#jd-upload-tab')?.addEventListener('click', () => {
+      document.querySelector('#jd-upload-tab').style.background = '#6366f1';
+      document.querySelector('#jd-paste-tab').style.background = '#4b5563';
+      document.querySelector('#jd-file-input').style.display = 'block';
+      document.querySelector('#jd-text-input').style.display = 'none';
+    });
+    
+    // Display ATS Feedback with JD matching keywords support
+    function displayATSFeedbackWithJD(feedback, isJDAnalysis = false) {
+      // Reset all sections
+      ['#ats-strengths', '#ats-improvements', '#ats-keywords', '#ats-matching-keywords', '#ats-formatting'].forEach(id => {
+        const el = document.querySelector(id);
+        if (el) el.style.display = 'none';
+      });
+      
+      // Overall
+      if (feedback.overall) {
+        document.querySelector('#ats-overall').textContent = feedback.overall;
+      }
+      
+      // Strengths
+      if (feedback.strengths && feedback.strengths.length > 0) {
+        const strengthsSection = document.querySelector('#ats-strengths');
+        const strengthsList = document.querySelector('#ats-strengths-list');
+        strengthsList.innerHTML = feedback.strengths.map(s => `<li>${s}</li>`).join('');
+        strengthsSection.style.display = 'block';
+      }
+      
+      // Improvements
+      if (feedback.improvements && feedback.improvements.length > 0) {
+        const improvementsSection = document.querySelector('#ats-improvements');
+        const improvementsList = document.querySelector('#ats-improvements-list');
+        improvementsList.innerHTML = feedback.improvements.map(s => `<li>${s}</li>`).join('');
+        improvementsSection.style.display = 'block';
+      }
+      
+      // Matching Keywords (JD analysis)
+      if (isJDAnalysis && feedback.matching_keywords && feedback.matching_keywords.length > 0) {
+        const matchingSection = document.querySelector('#ats-matching-keywords');
+        const matchingList = document.querySelector('#ats-matching-keywords-list');
+        matchingList.innerHTML = feedback.matching_keywords.map(k => 
+          `<span class="badge" style="background: #10b981; color: white; padding: 4px 10px; border-radius: 12px;">${k}</span>`
+        ).join('');
+        matchingSection.style.display = 'block';
+      }
+      
+      // Missing Keywords
+      if (feedback.missing_keywords && feedback.missing_keywords.length > 0) {
+        const keywordsSection = document.querySelector('#ats-keywords');
+        const keywordsList = document.querySelector('#ats-keywords-list');
+        keywordsList.innerHTML = feedback.missing_keywords.map(k => 
+          `<span class="badge" style="background: #ef4444; color: white; padding: 4px 10px; border-radius: 12px;">${k}</span>`
+        ).join('');
+        keywordsSection.style.display = 'block';
+      }
+      
+      // Formatting Tips
+      if (feedback.formatting_tips && feedback.formatting_tips.length > 0) {
+        const formattingSection = document.querySelector('#ats-formatting');
+        const formattingList = document.querySelector('#ats-formatting-list');
+        formattingList.innerHTML = feedback.formatting_tips.map(s => `<li>${s}</li>`).join('');
+        formattingSection.style.display = 'block';
+      }
+      
+      // Update analysis type label
+      const analysisTypeEl = document.querySelector('#ats-analysis-type');
+      if (analysisTypeEl) {
+        analysisTypeEl.textContent = isJDAnalysis ? '🎯 Job Description Match Analysis' : '📊 General ATS Analysis';
+      }
+      
+      // Update score label
+      const scoreLabelEl = document.querySelector('#ats-score-label');
+      if (scoreLabelEl) {
+        scoreLabelEl.textContent = isJDAnalysis ? 'JD Match Score' : 'ATS Score';
+      }
+    }
+    
+    // Analyze with JD
+    document.querySelector('#analyze-jd-btn')?.addEventListener('click', async () => {
+      const jdText = document.querySelector('#jd-text').value.trim();
+      const jdFile = document.querySelector('#jd-file').files[0];
+      const resumeFile = document.querySelector('#jd-resume-file').files[0];
+      
+      // Validate JD input
+      if (!jdText && !jdFile) {
+        manager.showToast('Please provide a Job Description (paste text or upload file)', 'error');
+        return;
+      }
+      
+      // Hide form, show loading
+      document.querySelector('#jd-analysis-form').style.display = 'none';
+      document.querySelector('#ats-content').style.display = 'block';
+      
+      const loadingDiv = document.querySelector('#ats-loading');
+      const resultDiv = document.querySelector('#ats-result');
+      const placeholderDiv = document.querySelector('#ats-placeholder');
+      const progressCircle = document.querySelector('#ats-progress-circle');
+      const loadingText = document.querySelector('#ats-loading-text');
+      const loadingStatus = document.querySelector('#ats-loading-status');
+      const loadingTitle = document.querySelector('#ats-loading-title');
+      
+      // Show loading
+      placeholderDiv.style.display = 'none';
+      resultDiv.style.display = 'none';
+      loadingDiv.style.display = 'block';
+      
+      if (loadingTitle) loadingTitle.textContent = '🎯 AI is comparing your resume with the Job Description...';
+      
+      // Reset loading animation
+      progressCircle.style.strokeDashoffset = 283;
+      loadingText.textContent = '0%';
+      
+      // Progress messages for JD analysis
+      const statusMessages = [
+        'Initializing AI analysis...',
+        'Parsing Job Description...',
+        'Extracting resume content...',
+        'Matching skills and keywords...',
+        'Analyzing experience alignment...',
+        'Evaluating qualification fit...',
+        'Generating match report...',
+        'Finalizing recommendations...'
+      ];
+      
+      let progress = 0;
+      const progressInterval = setInterval(() => {
+        progress += Math.random() * 12;
+        if (progress > 90) progress = 90;
+        
+        const offset = 283 - (progress / 100) * 283;
+        progressCircle.style.strokeDashoffset = offset;
+        loadingText.textContent = Math.round(progress) + '%';
+        
+        const messageIndex = Math.min(Math.floor(progress / 12), statusMessages.length - 1);
+        loadingStatus.textContent = statusMessages[messageIndex];
+      }, 350);
+      
+      try {
+        const formData = new FormData();
+        
+        // Add resume (file or signal to use profile)
+        if (resumeFile) {
+          formData.append('resume', resumeFile);
+        }
+        
+        // Add JD (text or file)
+        if (jdText) {
+          formData.append('jd_text', jdText);
+        } else if (jdFile) {
+          formData.append('jd_file', jdFile);
+        }
+        
+        const token = localStorage.getItem('token');
+        const fetchResponse = await fetch('http://localhost:5000/api/student/analyze-with-jd', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        });
+        
+        const response = await fetchResponse.json();
+        
+        clearInterval(progressInterval);
+        
+        // Complete progress
+        progressCircle.style.strokeDashoffset = 0;
+        loadingText.textContent = '100%';
+        loadingStatus.textContent = 'Analysis complete!';
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        loadingDiv.style.display = 'none';
+        
+        if (response.success) {
+          resultDiv.style.display = 'block';
+          animateATSScore(response.ats_score);
+          displayATSFeedbackWithJD(response.ats_feedback, true);
+          
+          document.querySelector('#ats-calculated-date').textContent = 
+            `Analyzed: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+          
+          manager.showToast(`JD Match Score: ${response.ats_score}/100`, 'success');
+        } else {
+          placeholderDiv.innerHTML = `<p style="color: #f87171;">⚠️ ${response.error || 'Failed to analyze'}</p>`;
+          placeholderDiv.style.display = 'block';
+        }
+        
+      } catch (err) {
+        clearInterval(progressInterval);
+        loadingDiv.style.display = 'none';
+        placeholderDiv.innerHTML = `<p style="color: #f87171;">⚠️ Error: ${err.message}</p>`;
+        placeholderDiv.style.display = 'block';
+        manager.showToast('Failed to analyze: ' + err.message, 'error');
+      }
+      
+      // Reset form
+      document.querySelector('#jd-resume-file').value = '';
+      document.querySelector('#jd-text').value = '';
+      document.querySelector('#jd-file').value = '';
+    });
+
+    // Edit profile
+    editProfileBtn.addEventListener('click', () => {
+      isEditing = true;
+      enableFormInputs(true);
+      editProfileBtn.style.display = 'none';
+      saveProfileBtn.style.display = 'inline-block';
+      cancelEditBtn.style.display = 'inline-block';
+    });
+
+    // Cancel edit
+    cancelEditBtn.addEventListener('click', () => {
+      isEditing = false;
+      enableFormInputs(false);
+      editProfileBtn.style.display = 'inline-block';
+      saveProfileBtn.style.display = 'none';
+      cancelEditBtn.style.display = 'none';
+      if (studentProfile) {
+        populateProfileForm(studentProfile);
+      }
+    });
+
+    // Enable/disable form inputs
+    function enableFormInputs(enable) {
+      const inputs = profileForm.querySelectorAll('input, textarea');
+      inputs.forEach(input => {
+        if (input.id !== 'enrollment_number' && input.id !== 'branch' && input.id !== 'graduation_year') {
+          input.disabled = !enable;
+        }
+      });
+    }
+
+    // Save profile
+    saveProfileBtn.addEventListener('click', async () => {
+      try {
+        const formData = {
+          full_name: document.querySelector('#full_name').value,
+          phone: document.querySelector('#phone').value,
+          cgpa: parseFloat(document.querySelector('#cgpa').value),
+          tenth_percentage: parseFloat(document.querySelector('#tenth_percentage').value) || null,
+          twelfth_percentage: parseFloat(document.querySelector('#twelfth_percentage').value) || null,
+          linkedin_url: document.querySelector('#linkedin_url').value,
+          github_url: document.querySelector('#github_url').value,
+          skills: document.querySelector('#skills').value,
+          experience: document.querySelector('#experience').value,
+          projects: document.querySelector('#projects').value,
+          certifications: document.querySelector('#certifications').value
+        };
+
+        const updated = await manager.api('/student/profile', 'PUT', formData);
+        studentProfile = updated;
+        
+        isEditing = false;
+        enableFormInputs(false);
+        editProfileBtn.style.display = 'inline-block';
+        saveProfileBtn.style.display = 'none';
+        cancelEditBtn.style.display = 'none';
+        
+        manager.showToast('Profile updated successfully!', 'success');
+      } catch (err) {
+        manager.showToast('Failed to update profile: ' + err.message, 'error');
+      }
+    });
+
+    // Resume upload
+    uploadResumeBtn.addEventListener('click', () => {
+      resumeUploadInput.click();
+    });
+
+    resumeUploadInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        uploadResumeBtn.disabled = true;
+        uploadResumeBtn.innerHTML = '<span>⏳ Uploading...</span>';
+
+        const formData = new FormData();
+        formData.append('resume', file);
+
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:5000/api/student/upload-resume', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Upload failed');
+        }
+
+        const result = await response.json();
+        manager.showToast(result.message, 'success');
+        
+        // Update resume status
+        updateResumeStatus(result.resume_url);
+        document.querySelector('#resume-parse-info').style.display = 'none';
+
+        // Auto-fill form with parsed data
+        if (result.parsed_data && Object.keys(result.parsed_data).length > 0) {
+          manager.showToast('Auto-filling profile from resume...', 'info');
+          await autofillFromParsedData(result.parsed_data);
+        }
+
+        // Reload profile
+        await loadProfile();
+
+      } catch (err) {
+        manager.showToast('Upload failed: ' + err.message, 'error');
+      } finally {
+        uploadResumeBtn.disabled = false;
+        uploadResumeBtn.innerHTML = '<span>📤 Upload Resume</span>';
+        resumeUploadInput.value = '';
+      }
+    });
+
+    // Delete resume
+    const deleteResumeBtn = document.querySelector('#delete-resume-btn');
+    deleteResumeBtn.addEventListener('click', async () => {
+      if (!confirm('Are you sure you want to delete your resume?')) {
+        return;
+      }
+
+      try {
+        deleteResumeBtn.disabled = true;
+        deleteResumeBtn.innerHTML = '<span>⏳ Deleting...</span>';
+
+        const token = localStorage.getItem('token');
+        const response = await fetch('http://localhost:5000/api/student/delete-resume', {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Delete failed');
+        }
+
+        const result = await response.json();
+        manager.showToast(result.message, 'success');
+        
+        // Update resume status
+        updateResumeStatus(null);
+        
+        // Reload profile
+        await loadProfile();
+
+      } catch (err) {
+        manager.showToast('Delete failed: ' + err.message, 'error');
+      } finally {
+        deleteResumeBtn.disabled = false;
+        deleteResumeBtn.innerHTML = '<span>🗑️ Delete Resume</span>';
+      }
+    });
+
+    // Auto-fill form from parsed resume data
+    async function autofillFromParsedData(parsedData) {
+      console.log('Parsed data received:', parsedData);  // Debug
+      const fieldsToUpdate = {};
+      
+      if (parsedData.phone) fieldsToUpdate.phone = parsedData.phone;
+      if (parsedData.cgpa) fieldsToUpdate.cgpa = parsedData.cgpa;
+      if (parsedData.tenth_percentage) fieldsToUpdate.tenth_percentage = parsedData.tenth_percentage;
+      if (parsedData.twelfth_percentage) fieldsToUpdate.twelfth_percentage = parsedData.twelfth_percentage;
+      if (parsedData.skills) fieldsToUpdate.skills = parsedData.skills;
+      if (parsedData.experience) fieldsToUpdate.experience = parsedData.experience;
+      if (parsedData.projects) fieldsToUpdate.projects = parsedData.projects;
+      if (parsedData.certifications) fieldsToUpdate.certifications = parsedData.certifications;
+      if (parsedData.linkedin_url) fieldsToUpdate.linkedin_url = parsedData.linkedin_url;
+      if (parsedData.github_url) fieldsToUpdate.github_url = parsedData.github_url;
+
+      console.log('Fields to update:', fieldsToUpdate);  // Debug
+      
+      if (Object.keys(fieldsToUpdate).length > 0) {
+        try {
+          await manager.api('/student/profile', 'PUT', fieldsToUpdate);
+          manager.showToast(`Profile updated with ${Object.keys(fieldsToUpdate).length} fields from resume!`, 'success');
+        } catch (err) {
+          console.error('Failed to auto-update profile:', err);
+          manager.showToast('Could not auto-fill some fields', 'warning');
+        }
+      } else {
+        manager.showToast('No data could be extracted from resume', 'warning');
+      }
+    }
 
     // Load on page load
-    loadDashboard();
+    console.log('Student portal initialized');
+    loadDashboard().catch(err => {
+      console.error('Failed to load dashboard:', err);
+    });
   </script>
 </body>
 </html>

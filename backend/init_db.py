@@ -1,7 +1,7 @@
 import pymysql
 from pathlib import Path
 
-SCHEMA_PATH = Path(r"c:\Jayesh\Placement and Intership portal\database\schema.sql")
+SCHEMA_PATH = Path(__file__).parent.parent / "database" / "schema.sql"
 
 sql_text = SCHEMA_PATH.read_text(encoding="utf-8")
 
