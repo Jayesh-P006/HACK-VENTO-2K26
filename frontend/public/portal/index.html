@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Silent Syntax Portal · Sign In</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <main>
+    <div class="page-shell">
+      <header class="header">
+        <div class="brand">
+          <img class="brand-icon" src="/brand/silent-syntax-icon.png" alt="Silent Syntax" />
+          <div class="pill">Silent Syntax Portal</div>
+          <span class="pill">Multi-role access</span>
+        </div>
+        <nav class="nav">
+          <a class="nav-back" href="/" aria-label="Back to landing page">← Landing</a>
+          <a href="register.html">Create account</a>
+          <a class="active" href="index.html">Login</a>
+        </nav>
+      </header>
+
+      <section class="hero-landing">
+        <div class="hero-content">
+          <div class="pill" style="margin-bottom: 20px;">🎓 Fast onboarding · Secure access</div>
+          <h1 class="landing-title">Welcome to Silent Syntax Portal</h1>
+          <p class="landing-subtitle">Unified access for Students, Companies, and Administrators. Track jobs, manage applicants, and oversee approvals in one streamlined workspace.</p>
+        </div>
+
+        <div class="login-container">
+          <div class="card glass animate" style="padding: 32px; max-width: 440px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <h2 style="font-size: 28px; margin-bottom: 8px;">Sign In</h2>
+              <p class="minor">Use your role credentials to continue</p>
+            </div>
+            
+            <form id="login-form" class="grid" style="gap: 16px;">
+              <div>
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" placeholder="you@university.edu" required>
+              </div>
+              <div>
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password" placeholder="••••••••" required>
+              </div>
+              <button id="login-submit" class="btn btn-primary" type="submit" style="margin-top: 8px; padding: 14px;">Sign In</button>
+            </form>
+            
+            <p class="minor" style="margin-top: 16px; text-align: center;">Need an account? <a href="register.html" style="color: var(--accent-2); font-weight: 600;">Create one</a></p>
+            
+            <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08);">
+              <p class="minor" style="text-align: center; margin-bottom: 12px; font-weight: 600;">Demo Accounts</p>
+              <div class="demo-accounts">
+                <div class="demo-chip">👨‍💼 Admin: admin@university.edu / admin123</div>
+                <div class="demo-chip">🎓 Student: student@university.edu / student123</div>
+                <div class="demo-chip">🏢 Company: company@tech.com / company123</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🎓</div>
+          <h3>Student Dashboard</h3>
+          <p class="minor">Discover eligible jobs, apply instantly, and track application status with animated kanban columns.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🏢</div>
+          <h3>Company Dashboard</h3>
+          <p class="minor">Publish roles, review applicants, and move candidates through decision statuses with one click.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>Admin Dashboard</h3>
+          <p class="minor">Approve users and jobs, broadcast announcements, and monitor placements via live progress bars.</p>
+        </div>
+      </section>
+
+      <section class="stat-row-landing">
+        <div class="stat-chip-landing">
+          <div class="stat-number">3</div>
+          <div class="stat-label">Role Types</div>
+        </div>
+        <div class="stat-chip-landing">
+          <div class="stat-number">∞</div>
+          <div class="stat-label">Job Opportunities</div>
+        </div>
+        <div class="stat-chip-landing">
+          <div class="stat-number">24/7</div>
+          <div class="stat-label">Access</div>
+        </div>
+      </section>
+
+
+    </div>
+  </main>
+  <script>
+    const API_BASE = '/api';
+    function showToast(msg, type = 'info') {
+      let stack = document.getElementById('toast-stack');
+      if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'toast-stack';
+        stack.className = 'toast-stack';
+        document.body.appendChild(stack);
+      }
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = msg;
+      stack.appendChild(toast);
+      setTimeout(() => toast.remove(), 4200);
+    }
+
+    const form = document.querySelector('#login-form');
+    const submitBtn = document.querySelector('#login-submit');
+
+    // Only auto-redirect if we have BOTH token AND valid user data
+    const existingToken = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+    if (existingToken && userData) {
+      try {
+        const user = JSON.parse(userData);
+        // Validate user object has required fields
+        if (user && user.role_id && user.id) {
+          if (user.role_id === 1) window.location.href = 'student.html';
+          else if (user.role_id === 2) window.location.href = 'company.html';
+          else if (user.role_id === 3) window.location.href = 'admin-dashboard.html';
+        } else {
+          // Invalid user data, clear storage
+          localStorage.clear();
+        }
+      } catch (_) {
+        // Invalid JSON, clear storage
+        localStorage.clear();
+      }
+    }
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Signing in...';
+      try {
+        const email = form.querySelector('#email').value.trim();
+        const password = form.querySelector('#password').value;
+        const response = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        }).catch(networkError => {
+          throw new Error('Cannot connect to server. Please ensure the backend is running.');
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Login failed');
+        }
+        const data = await response.json();
+        localStorage.setItem('token', data.access_token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        if (data.profile) localStorage.setItem('profile', JSON.stringify(data.profile));
+        showToast('Welcome back!', 'success');
+        const roleId = data.user.role_id;
+        if (roleId === 1) setTimeout(() => { window.location.href = 'student.html'; }, 500);
+        else if (roleId === 2) setTimeout(() => { window.location.href = 'company.html'; }, 500);
+        else if (roleId === 3) setTimeout(() => { window.location.href = 'admin-dashboard.html'; }, 500);
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || 'Login error', 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Sign In';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Company Dashboard</title>
+  <link rel="stylesheet" href="assets/css/styles.css?v=2">
+</head>
+<body>
+  <main>
+    <div class="page-shell">
+      <div class="navbar-lite">
+        <div class="brand">
+          <div class="pill">Company Dashboard</div>
+        </div>
+        <div class="nav" style="flex-wrap: wrap;">
+          <a href="#" class="active" data-nav="overview">Overview</a>
+          <a href="#" data-nav="applicants">Applicant Management</a>
+        </div>
+        <div class="user-badge">
+          <div class="user-avatar" data-user-avatar>C</div>
+          <div>
+            <div data-user-name>Company</div>
+            <div class="minor" data-user-email>email</div>
+          </div>
+          <button class="btn btn-ghost" data-logout>Logout</button>
+        </div>
+      </div>
+
+      <section class="grid grid-4" id="company-stats"></section>
+
+      <!-- Overview Section -->
+      <div id="overview-section">
+        <section class="grid grid-2" style="margin-top: 18px; align-items: start; gap: 18px;">
+          <div>
+            <div class="section-title"><h3>Job postings</h3><span class="badge badge-blue">Live</span></div>
+            <div id="company-jobs" class="grid" style="gap: 14px;"></div>
+          </div>
+          <div class="grid" style="gap: 18px;">
+            <!-- Announcements in right column -->
+            <div class="card">
+              <div class="section-title"><h3>Announcements</h3><span class="badge badge-amber">Portal</span></div>
+              <div id="company-announcements" class="grid" style="gap: 12px; margin-top: 12px;"></div>
+            </div>
+            
+            <div class="card">
+              <div class="section-title"><h3>Post a job</h3><span class="badge badge-amber">New</span></div>
+            
+            <!-- Session Selector -->
+            <div style="margin: 16px 0; padding: 12px; background: rgba(99, 102, 241, 0.1); border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.2);">
+              <label for="session_id" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                📅 Placement Session *
+              </label>
+              <select name="session_id" id="session_id" required style="width: 100%;">
+                <option value="">Select a session...</option>
+              </select>
+              <small class="minor" style="display: block; margin-top: 6px;">
+                ℹ️ Job will be visible to batches eligible for this session
+              </small>
+              <div id="session-batches-info" style="margin-top: 8px; font-size: 13px;" class="minor"></div>
+            </div>
+
+            <form id="job-form" class="grid" style="gap: 12px;">
+              <div class="form-grid">
+                <div>
+                  <label for="title">Title</label>
+                  <input name="title" id="title" required placeholder="Software Engineer">
+                </div>
+                <div>
+                  <label for="job_type">Job Type</label>
+                  <select name="job_type" id="job_type">
+                    <option>Full-Time</option>
+                    <option>Internship</option>
+                    <option>Part-Time</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="location">Location</label>
+                  <select name="location" id="location" required>
+                    <option value="">Select Location</option>
+                    <option value="Onsite">Onsite</option>
+                    <option value="Remote">Remote</option>
+                    <option value="Hybrid">Hybrid</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="salary_range">Salary Range</label>
+                  <input name="salary_range" id="salary_range" placeholder="₹8-12 LPA">
+                </div>
+                <div>
+                  <label for="min_cgpa">Min CGPA</label>
+                  <input type="number" step="0.1" name="min_cgpa" id="min_cgpa" value="0">
+                </div>
+                <div>
+                  <label for="application_deadline">Application Deadline</label>
+                  <input type="date" name="application_deadline" id="application_deadline" required>
+                </div>
+                <div class="form-span-full">
+                  <label>Eligible Branches</label>
+                  <div class="branch-selector" id="branch-selector">
+                    <label class="branch-item"><input type="checkbox" value="Computer Science"> <span>Computer Science</span></label>
+                    <label class="branch-item"><input type="checkbox" value="Information Technology"> <span>Information Technology</span></label>
+                    <label class="branch-item"><input type="checkbox" value="Electronics and Telecommunication"> <span>Electronics and Telecommunication</span></label>
+                    <label class="branch-item"><input type="checkbox" value="Mechanical Engineering"> <span>Mechanical Engineering</span></label>
+                    <label class="branch-item"><input type="checkbox" value="Electronics and Instrumentation"> <span>Electronics and Instrumentation</span></label>
+                    <label class="branch-item"><input type="checkbox" value="Civil Engineering"> <span>Civil Engineering</span></label>
+                    <label class="branch-item"><input type="checkbox" value="Computer Science and Business System"> <span>Computer Science and Business System</span></label>
+                  </div>
+                  <small style="color: var(--muted); font-size: 12px; margin-top: 4px; display: block;">✓ Select multiple branches</small>
+                </div>
+              </div>
+              <div>
+                <label for="description">Description</label>
+                <textarea name="description" id="description" required placeholder="Role overview"></textarea>
+              </div>
+              <div>
+                <label for="requirements">Requirements</label>
+                <textarea name="requirements" id="requirements" placeholder="Skills, tech stack"></textarea>
+              </div>
+              <button class="btn btn-primary" type="submit">Post Job</button>
+            </form>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Applicant Management Section -->
+      <div id="applicants-section" style="display: none;">
+        <section style="margin-top: 18px;">
+          <div class="section-title">
+            <h3>Applicant Management</h3>
+            <span class="badge badge-blue">All Jobs</span>
+          </div>
+          
+          <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+            <label style="display: flex; align-items: center; gap: 8px;">
+              <span style="color: var(--muted); font-size: 14px;">Filter by Job:</span>
+              <select id="job-filter" style="min-width: 250px;">
+                <option value="">All Jobs</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="applicants-by-job" style="margin-top: 20px;"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- Edit Job Modal -->
+  <div id="edit-job-modal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="card" style="width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h3>Edit Job Posting</h3>
+        <button onclick="closeEditModal()" class="btn btn-ghost" style="padding: 4px 8px;">✕</button>
+      </div>
+      <form id="edit-job-form" class="grid" style="gap: 12px;">
+        <input type="hidden" id="edit-job-id">
+        <div class="form-grid">
+          <div>
+            <label for="edit-title">Title</label>
+            <input name="title" id="edit-title" required placeholder="Software Engineer">
+          </div>
+          <div>
+            <label for="edit-job_type">Job Type</label>
+            <select name="job_type" id="edit-job_type">
+              <option>Full-Time</option>
+              <option>Internship</option>
+              <option>Part-Time</option>
+            </select>
+          </div>
+          <div>
+            <label for="edit-location">Location</label>
+            <select name="location" id="edit-location" required>
+              <option value="">Select Location</option>
+              <option value="Onsite">Onsite</option>
+              <option value="Remote">Remote</option>
+              <option value="Hybrid">Hybrid</option>
+            </select>
+          </div>
+          <div>
+            <label for="edit-salary_range">Salary Range</label>
+            <input name="salary_range" id="edit-salary_range" placeholder="₹8-12 LPA">
+          </div>
+          <div>
+            <label for="edit-min_cgpa">Min CGPA</label>
+            <input type="number" step="0.1" name="min_cgpa" id="edit-min_cgpa" value="0">
+          </div>
+          <div>
+            <label for="edit-application_deadline">Application Deadline</label>
+            <input type="date" name="application_deadline" id="edit-application_deadline" required>
+          </div>
+          <div class="form-span-full">
+            <label>Eligible Branches</label>
+            <div class="branch-selector" id="edit-branch-selector">
+              <label class="branch-item"><input type="checkbox" value="Computer Science"> <span>Computer Science</span></label>
+              <label class="branch-item"><input type="checkbox" value="Information Technology"> <span>Information Technology</span></label>
+              <label class="branch-item"><input type="checkbox" value="Electronics and Telecommunication"> <span>Electronics and Telecommunication</span></label>
+              <label class="branch-item"><input type="checkbox" value="Mechanical Engineering"> <span>Mechanical Engineering</span></label>
+              <label class="branch-item"><input type="checkbox" value="Electronics and Instrumentation"> <span>Electronics and Instrumentation</span></label>
+              <label class="branch-item"><input type="checkbox" value="Civil Engineering"> <span>Civil Engineering</span></label>
+              <label class="branch-item"><input type="checkbox" value="Computer Science and Business System"> <span>Computer Science and Business System</span></label>
+            </div>
+            <small style="color: var(--muted); font-size: 12px; margin-top: 4px; display: block;">✓ Select multiple branches</small>
+          </div>
+        </div>
+        <div>
+          <label for="edit-description">Description</label>
+          <textarea name="description" id="edit-description" required placeholder="Role overview"></textarea>
+        </div>
+        <div>
+          <label for="edit-requirements">Requirements</label>
+          <textarea name="requirements" id="edit-requirements" placeholder="Skills, tech stack"></textarea>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button type="button" onclick="closeEditModal()" class="btn btn-ghost">Cancel</button>
+          <button type="submit" class="btn btn-primary">Update Job</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="delete-job-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1001; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div class="card" style="width: 90%; max-width: 480px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(15, 23, 42, 0.95)); border: 1px solid rgba(239, 68, 68, 0.3); box-shadow: 0 20px 60px rgba(239, 68, 68, 0.3);">
+      <div style="text-align: center; padding: 20px;">
+        <div style="width: 80px; height: 80px; margin: 0 auto 20px; background: rgba(239, 68, 68, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid rgba(239, 68, 68, 0.4);">
+          <span style="font-size: 40px;">🗑️</span>
+        </div>
+        <h3 style="margin-bottom: 12px; color: #fca5a5;">Delete Job Posting?</h3>
+        <p style="color: #cbd5e1; margin-bottom: 8px; font-size: 15px;" id="delete-job-title">Are you sure you want to delete this job?</p>
+        <p style="color: #94a3b8; font-size: 13px; margin-bottom: 30px;">⚠️ This action cannot be undone. All applicants and related data will be permanently removed.</p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button onclick="closeDeleteModal()" class="btn btn-ghost" style="padding: 12px 28px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12);">
+            Cancel
+          </button>
+          <button onclick="confirmDeleteJob()" class="btn" style="padding: 12px 28px; background: linear-gradient(135deg, #ef4444, #dc2626); color: white; font-weight: 600; box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);">
+            Yes, Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '/api';
+
+    function getAuth() {
+      try {
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        if (!token || !user) return null;
+        return { token, user };
+      } catch (_) { return null; }
+    }
+
+    function showToast(msg, type = 'info') {
+      let stack = document.getElementById('toast-stack');
+      if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'toast-stack';
+        stack.className = 'toast-stack';
+        document.body.appendChild(stack);
+      }
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.textContent = msg;
+      stack.appendChild(t);
+      setTimeout(() => t.remove(), 4200);
+    }
+
+    async function api(path, opts = {}) {
+      const auth = getAuth();
+      if (!auth) { 
+        console.error('❌ No auth token, redirecting to login');
+        window.location.href = 'index.html'; 
+        return; 
+      }
+      const isFormData = opts.body instanceof FormData;
+      const headers = isFormData ? { ...opts.headers } : { 'Content-Type': 'application/json', ...opts.headers };
+      headers.Authorization = `Bearer ${auth.token}`;
+      
+      console.log(`📡 API Call: ${opts.method || 'GET'} ${API_BASE}${path}`);
+      
+      try {
+        const resp = await fetch(`${API_BASE}${path}`, {
+          method: opts.method || 'GET',
+          headers,
+          body: isFormData ? opts.body : (opts.body ? JSON.stringify(opts.body) : undefined),
+        });
+        
+        const data = await resp.json();
+        console.log(`📥 API Response [${resp.status}]:`, data);
+        
+        if (!resp.ok) {
+          console.error(`❌ API Error [${resp.status}]:`, data);
+          throw new Error(data.error || `Request failed with status ${resp.status}`);
+        }
+        return data;
+      } catch (networkError) {
+        console.error('❌ Network error:', networkError);
+        if (networkError.message.includes('Failed to fetch') || networkError.name === 'TypeError') {
+          throw new Error('Cannot connect to server. Please ensure the backend is running.');
+        }
+        throw networkError;
+      }
+    }
+
+    const auth = getAuth();
+    if (!auth || auth.user.role_id !== 2) { 
+      console.error('❌ Not authorized as company user, redirecting...');
+      console.log('Auth state:', auth);
+      window.location.href = 'index.html'; 
+    } else {
+      console.log('✅ Authorized as company user:', auth.user.email);
+    }
+
+    // Global variables
+    let jobs = [];
+    let allApplicants = [];
+    let currentView = 'overview';
+    let jobsEl, statsEl, annEl;
+
+    // Navigation handling
+    function switchView(view) {
+      console.log('Switching to view:', view);
+      currentView = view;
+      document.querySelectorAll('[data-nav]').forEach(link => {
+        link.classList.toggle('active', link.getAttribute('data-nav') === view);
+      });
+      
+      const overviewSection = document.getElementById('overview-section');
+      const applicantsSection = document.getElementById('applicants-section');
+      
+      if (overviewSection) overviewSection.style.display = view === 'overview' ? 'block' : 'none';
+      if (applicantsSection) applicantsSection.style.display = view === 'applicants' ? 'block' : 'none';
+      
+      if (view === 'applicants') {
+        console.log('Loading applicant management...');
+        loadApplicantManagement();
+      }
+    }
+    
+    // Setup navigation and initialize after DOM loads
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('DOM loaded, initializing...');
+      
+      // Set up navigation
+      document.querySelectorAll('[data-nav]').forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const view = e.target.getAttribute('data-nav');
+          console.log('Nav clicked:', view);
+          switchView(view);
+        });
+      });
+      
+      const logoutBtn = document.querySelector('[data-logout]');
+      if (logoutBtn) {
+        console.log('Logout button found, attaching listener');
+        logoutBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          console.log('Logout clicked, clearing storage...');
+          localStorage.clear();
+          sessionStorage.clear();
+          console.log('Redirecting to index.html');
+          window.location.href = 'index.html';
+        });
+      } else {
+        console.error('Logout button not found!');
+      }
+
+      // Set user info
+      if (document.querySelector('[data-user-name]')) {
+        document.querySelector('[data-user-name]').textContent = auth.user.email;
+      }
+      if (document.querySelector('[data-user-email]')) {
+        document.querySelector('[data-user-email]').textContent = auth.user.email;
+      }
+      if (document.querySelector('[data-user-avatar]')) {
+        document.querySelector('[data-user-avatar]').textContent = 'C';
+      }
+
+      // Get element references
+      jobsEl = document.querySelector('#company-jobs');
+      statsEl = document.querySelector('#company-stats');
+      annEl = document.querySelector('#company-announcements');
+
+      // Load initial data
+      loadAll();
+    });
+
+    async function loadAll() {
+      console.log('🔄 Loading all company data...');
+      try {
+        const results = await Promise.allSettled([
+          api('/company/jobs'),
+          api('/announcements'),
+          loadSessions()
+        ]);
+        
+        // Handle jobs result
+        const jobsResult = results[0];
+        if (jobsResult.status === 'fulfilled') {
+          jobs = Array.isArray(jobsResult.value) ? jobsResult.value : (jobsResult.value?.data || jobsResult.value?.jobs || []);
+          console.log('✅ Loaded jobs:', jobs.length);
+        } else {
+          console.error('❌ Jobs error:', jobsResult.reason);
+          showToast('Failed to load jobs: ' + jobsResult.reason.message, 'error');
+          jobs = [];
+        }
+        
+        // Handle announcements result
+        const annResult = results[1];
+        let announcements = [];
+        if (annResult.status === 'fulfilled') {
+          announcements = Array.isArray(annResult.value) ? annResult.value : (annResult.value?.data || []);
+          console.log('✅ Loaded announcements:', announcements.length);
+        } else {
+          console.warn('⚠️ Announcements error:', annResult.reason);
+          // Don't show error toast for announcements, it's not critical
+        }
+        
+        // Handle sessions result
+        const sessionsResult = results[2];
+        if (sessionsResult.status === 'rejected') {
+          console.warn('⚠️ Sessions error:', sessionsResult.reason);
+          // Sessions error is handled in loadSessions function
+        } else {
+          console.log('✅ Sessions loaded successfully');
+        }
+        
+        renderStats();
+        renderJobs();
+        renderAnnouncements(announcements);
+        console.log('✅ All data rendered');
+      } catch (err) {
+        console.error('❌ Critical error in loadAll:', err);
+        showToast('Failed to load dashboard: ' + err.message, 'error');
+      }
+    }
+
+    function renderStats() {
+      const total = jobs.length;
+      const active = jobs.filter(j => j.status === 'Approved').length;
+      const pending = jobs.filter(j => j.status === 'Pending').length;
+      const closed = jobs.filter(j => j.status === 'Closed').length;
+      
+      const statsEl = document.getElementById('company-stats');
+      if (statsEl) {
+        statsEl.innerHTML = `
+          <div class="card animate"><p class="minor">Total Jobs</p><h2>${total}</h2></div>
+          <div class="card animate"><p class="minor">Active</p><h2>${active}</h2></div>
+          <div class="card animate"><p class="minor">Pending</p><h2>${pending}</h2></div>
+          <div class="card animate"><p class="minor">Closed</p><h2>${closed}</h2></div>`;
+      }
+    }
+
+    function renderJobs() {
+      const jobsEl = document.getElementById('company-jobs');
+      if (!jobsEl) return;
+      
+      if (jobs.length === 0) {
+        jobsEl.innerHTML = '<div class="card" style="padding: 40px; text-align: center; color: #94a3b8;"><p>No jobs posted yet</p><p class="minor" style="margin-top: 8px;">Post your first job using the form on the right</p></div>';
+        return;
+      }
+      
+      jobsEl.innerHTML = jobs.map(job => `
+        <article class="job-card animate">
+          <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+            <div><h3>${job.title}</h3><div class="job-meta">${job.job_type} • ${job.location}</div></div>
+            <span class="badge badge-${job.status === 'Approved' ? 'green' : job.status === 'Pending' ? 'amber' : 'blue'}">${job.status}</span>
+          </div>
+          <p class="minor">${job.description || '—'}</p>
+          <div class="job-meta">
+            <span>CGPA ${job.min_cgpa || 0}+</span>
+            ${job.salary_range ? `<span>${job.salary_range}</span>` : ''}
+            <span>${new Date(job.application_deadline).toLocaleDateString()}</span>
+          </div>
+          <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="configureHiringProcess(${job.id})" style="font-size: 14px; padding: 8px 16px;">
+              ⚙️ Configure Hiring Process
+            </button>
+            <button class="btn btn-secondary" onclick="viewApplicants(${job.id})" style="font-size: 14px; padding: 8px 16px;">
+              👥 View Applicants
+            </button>
+            <button class="btn btn-ghost" onclick="editJob(${job.id})" style="font-size: 14px; padding: 8px 16px;">
+              ✏️ Edit
+            </button>
+            <button class="btn btn-ghost" onclick="deleteJob(${job.id})" style="font-size: 14px; padding: 8px 16px; color: #ef4444;">
+              🗑️ Delete
+            </button>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function renderAnnouncements(list) {
+      if (!annEl) return;
+      
+      if (list.length === 0) {
+        annEl.innerHTML = '<p class="minor" style="text-align: center; padding: 20px;">No announcements at this time</p>';
+        return;
+      }
+      
+      annEl.innerHTML = list.map(ann => {
+        const date = new Date(ann.created_at).toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        const targetBadge = ann.target_role === 1 ? '<span class="badge badge-blue">Students</span>' : 
+                            ann.target_role === 2 ? '<span class="badge badge-green">Companies</span>' : 
+                            '<span class="badge badge-amber">All</span>';
+        return `
+          <div class="card animate" style="padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+              <h4 style="margin: 0; font-size: 16px;">${ann.title}</h4>
+              ${targetBadge}
+            </div>
+            <p class="minor" style="margin: 8px 0; line-height: 1.5;">${ann.message}</p>
+            <div class="minor" style="font-size: 12px; margin-top: 8px; color: #9ca3af;">
+              📅 ${date}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Applicant Management Section
+    function extractRoundNumber(status) {
+      if (!status) return null;
+      const m = String(status).match(/Round\s+(\d+):/i);
+      return m ? parseInt(m[1], 10) : null;
+    }
+
+    function formatAtsBadge(score) {
+      if (score === null || score === undefined || score === '') return '<span class="minor">—</span>';
+      const numeric = Number(score);
+      if (Number.isNaN(numeric)) return '<span class="minor">—</span>';
+      const cls = numeric >= 80 ? 'badge-green' : numeric >= 60 ? 'badge-blue' : 'badge-amber';
+      return `<span class="badge ${cls}">${numeric.toFixed(1)}</span>`;
+    }
+
+    function statusOptionLabelForRound(round) {
+      const name = round.round_name || round.round_type || `Round ${round.round_number}`;
+      return `Round ${round.round_number}: ${name}`;
+    }
+
+    function buildStatusOptions(currentStatus, rounds) {
+      const opts = [];
+
+      // Baseline flow
+      opts.push('Applied');
+
+      // If rounds are configured, use them as the primary progression
+      if (Array.isArray(rounds) && rounds.length) {
+        rounds
+          .slice()
+          .sort((a, b) => (a.round_number || 0) - (b.round_number || 0))
+          .forEach(r => opts.push(statusOptionLabelForRound(r)));
+      } else {
+        // Backward-compatible statuses when no rounds exist
+        opts.push('Shortlisted', 'Interview');
+      }
+
+      opts.push('Selected', 'Rejected');
+
+      // Ensure we don't lose legacy/unexpected statuses
+      if (currentStatus && !opts.includes(currentStatus)) {
+        opts.unshift(currentStatus);
+      }
+
+      const seen = new Set();
+      return opts.filter(v => {
+        if (seen.has(v)) return false;
+        seen.add(v);
+        return true;
+      });
+    }
+
+    function getCurrentRoundLabel(appStatus, rounds) {
+      const n = extractRoundNumber(appStatus);
+      if (!n) return '—';
+      const found = (rounds || []).find(r => Number(r.round_number) === n);
+      return found ? statusOptionLabelForRound(found) : `Round ${n}`;
+    }
+
+    async function loadApplicantManagement() {
+      try {
+        console.log('Loading applicant management for', jobs.length, 'jobs');
+        
+        if (jobs.length === 0) {
+          const container = document.getElementById('applicants-by-job');
+          if (container) {
+            container.innerHTML = '<div class="card" style="padding: 40px; text-align: center; color: #94a3b8;"><p>No jobs posted yet</p><p class="minor" style="margin-top: 8px;">Post a job first to see applicants</p></div>';
+          }
+          return;
+        }
+        
+        // Load all applicants for all jobs
+        const results = await Promise.all(jobs.map(async (job) => {
+          let applicants = [];
+          let rounds = [];
+          try {
+            applicants = await api(`/company/job/${job.id}/applicants`);
+          } catch (e) {
+            console.warn(`Failed to load applicants for job ${job.id}:`, e);
+            applicants = [];
+          }
+          try {
+            const roundsRes = await api(`/company/hiring-rounds/job/${job.id}`);
+            rounds = roundsRes?.rounds || [];
+          } catch (e) {
+            console.warn(`Failed to load rounds for job ${job.id}:`, e);
+            rounds = [];
+          }
+          return { job, applicants: applicants || [], rounds };
+        }));
+        allApplicants = results;
+        
+        console.log('Loaded applicants for all jobs:', allApplicants);
+        
+        // Populate job filter dropdown
+        const jobFilter = document.getElementById('job-filter');
+        if (jobFilter) {
+          jobFilter.innerHTML = '<option value="">All Jobs</option>' + 
+            jobs.map(job => `<option value="${job.id}">${job.title} (${job.job_type})</option>`).join('');
+        }
+        
+        renderApplicantManagement();
+      } catch (err) {
+        console.error('Error loading applicant management:', err);
+        showToast(err.message, 'error');
+      }
+    }
+
+    function renderApplicantManagement(filteredJobId = null) {
+      const container = document.getElementById('applicants-by-job');
+      const dataToShow = filteredJobId 
+        ? allApplicants.filter(item => item.job.id == filteredJobId)
+        : allApplicants;
+      
+      if (dataToShow.length === 0) {
+        container.innerHTML = '<div class="card"><p class="minor">No jobs found</p></div>';
+        return;
+      }
+      
+      container.innerHTML = dataToShow.map(item => {
+        const job = item.job;
+        const applicants = item.applicants;
+        const rounds = item.rounds || [];
+        const applicantCount = applicants.length;
+        
+        return `
+          <div class="card" style="margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px;">
+              <div>
+                <h3>${job.title}</h3>
+                <div class="job-meta">${job.job_type} • ${job.location}</div>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span class="badge badge-blue">${applicantCount} Applicant${applicantCount !== 1 ? 's' : ''}</span>
+                <span class="badge badge-${job.status === 'Approved' ? 'green' : job.status === 'Pending' ? 'amber' : 'blue'}">${job.status}</span>
+              </div>
+            </div>
+            
+            ${applicants.length > 0 ? `
+              <div class="card glass" style="overflow-x: auto;">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Branch</th>
+                      <th>CGPA</th>
+                      <th>Phone</th>
+                      <th>ATS Score</th>
+                      <th>Current Round</th>
+                      <th>Skills</th>
+                      <th>Applied</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${applicants.map(app => `
+                      <tr>
+                        <td><strong>${app.full_name}</strong></td>
+                        <td class="minor">${app.branch || '—'}</td>
+                        <td><span class="badge badge-blue">${app.cgpa || '—'}</span></td>
+                        <td class="minor">${app.phone || '—'}</td>
+                        <td>${formatAtsBadge(app.ats_score)}</td>
+                        <td class="minor">${getCurrentRoundLabel(app.application_status, rounds)}</td>
+                        <td class="minor" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${(app.skills || '').slice(0, 50)}${(app.skills || '').length > 50 ? '...' : ''}</td>
+                        <td class="minor">${new Date(app.applied_at).toLocaleDateString()}</td>
+                        <td>
+                          <select data-app-id="${app.application_id}" data-status-select style="padding: 6px 10px;">
+                            ${buildStatusOptions(app.application_status, rounds).map(opt => `
+                              <option value="${opt}" ${app.application_status === opt ? 'selected' : ''}>${opt}</option>
+                            `).join('')}
+                          </select>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            ` : '<p class="minor">No applicants yet for this job</p>'}
+          </div>
+        `;
+      }).join('');
+      
+      // Attach event listeners to status dropdowns
+      document.querySelectorAll('[data-status-select]').forEach(sel => {
+        sel.dataset.oldValue = sel.value;
+        sel.addEventListener('change', updateAppStatus);
+      });
+      
+      // Setup job filter handler
+      const jobFilter = document.getElementById('job-filter');
+      if (jobFilter && !jobFilter.dataset.listenerAttached) {
+        jobFilter.addEventListener('change', (e) => {
+          renderApplicantManagement(e.target.value || null);
+        });
+        jobFilter.dataset.listenerAttached = 'true';
+      }
+    }
+
+    async function updateAppStatus(e) {
+      const appId = e.target.getAttribute('data-app-id');
+      const newStatus = e.target.value;
+      const oldValue = e.target.dataset.oldValue;
+      try {
+        await api('/company/applicant-status', { method: 'PUT', body: { application_id: appId, status: newStatus } });
+        e.target.dataset.oldValue = newStatus;
+        showToast('Status updated', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+        e.target.value = oldValue || 'Applied';
+      }
+    }
+
+    // Load available sessions
+    async function loadSessions() {
+      console.log('📅 Loading placement sessions...');
+      try {
+        const sessions = await api('/company/sessions');
+        const sessionSelect = document.getElementById('session_id');
+        if (sessionSelect && sessions) {
+          if (sessions.length === 0) {
+            sessionSelect.innerHTML = '<option value="">No active sessions available</option>';
+            console.warn('⚠️ No active/upcoming sessions found');
+            showToast('No active placement sessions. Contact admin to create one.', 'warning');
+            return;
+          }
+          
+          sessionSelect.innerHTML = '<option value="">Select a session...</option>' + sessions.map(s => 
+            `<option value="${s.id}">${s.name} (${s.status})${s.batch_count ? ' - ' + s.batch_count + ' batches' : ''}</option>`
+          ).join('');
+          
+          console.log('✅ Loaded sessions:', sessions.length);
+          
+          // Add change listener to show batch info
+          if (!sessionSelect.dataset.listenerAttached) {
+            sessionSelect.addEventListener('change', async (e) => {
+              const sessionId = e.target.value;
+              const infoEl = document.getElementById('session-batches-info');
+              if (!infoEl) return;
+              
+              if (!sessionId) {
+                infoEl.innerHTML = '';
+                return;
+              }
+              
+              const session = sessions.find(s => s.id == sessionId);
+              if (session && session.batches && session.batches.length > 0) {
+                infoEl.innerHTML = 
+                  `<strong>Eligible batches:</strong> ${session.batches.map(b => b.batch_code).join(', ')}`;
+              } else {
+                infoEl.innerHTML = 
+                  '<span style="color: #f59e0b;">⚠️ No batches mapped to this session yet</span>';
+              }
+            });
+            sessionSelect.dataset.listenerAttached = 'true';
+          }
+        }
+      } catch (err) {
+        console.error('❌ Failed to load sessions:', err);
+        showToast('Failed to load sessions: ' + err.message, 'error');
+        const sessionSelect = document.getElementById('session_id');
+        if (sessionSelect) {
+          sessionSelect.innerHTML = '<option value="">Error loading sessions</option>';
+        }
+      }
+    }
+
+    const form = document.querySelector('#job-form');
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+      
+      // Validate session_id
+      if (!payload.session_id) {
+        showToast('Please select a placement session', 'error');
+        return;
+      }
+      
+      // Convert session_id to number
+      payload.session_id = parseInt(payload.session_id);
+      
+      // Handle checkbox-based eligible_branches
+      const branchCheckboxes = document.querySelectorAll('#branch-selector input[type="checkbox"]:checked');
+      const selectedBranches = Array.from(branchCheckboxes).map(cb => cb.value);
+      payload.eligible_branches = selectedBranches.join(', ');
+      
+      payload.min_cgpa = parseFloat(payload.min_cgpa || '0') || 0;
+      const btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Posting...';
+      try {
+        await api('/company/jobs', { method: 'POST', body: payload });
+        showToast('Job posted (pending approval)', 'success');
+        form.reset();
+        // Reset branch checkboxes
+        document.querySelectorAll('#branch-selector input[type="checkbox"]').forEach(cb => cb.checked = false);
+        await loadAll();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Post Job';
+      }
+    });
+    
+    // Navigate to hiring process configuration
+    window.configureHiringProcess = (jobId) => {
+      window.location.href = `hiring-rounds-config.html?jobId=${jobId}`;
+    };
+    
+    // View applicants for a job
+    window.viewApplicants = (jobId) => {
+      // Scroll to applicant management section
+      document.getElementById('applicants-section').scrollIntoView({ behavior: 'smooth' });
+      // Set the job filter
+      document.getElementById('job-filter').value = jobId;
+      document.getElementById('job-filter').dispatchEvent(new Event('change'));
+    };
+
+    // Edit job
+    window.editJob = (jobId) => {
+      const job = jobs.find(j => j.id === jobId);
+      if (!job) return;
+      
+      document.getElementById('edit-job-id').value = job.id;
+      document.getElementById('edit-title').value = job.title;
+      document.getElementById('edit-job_type').value = job.job_type;
+      document.getElementById('edit-location').value = job.location || '';
+      document.getElementById('edit-salary_range').value = job.salary_range || '';
+      document.getElementById('edit-min_cgpa').value = job.min_cgpa || 0;
+      document.getElementById('edit-application_deadline').value = job.application_deadline;
+      
+      // Handle checkbox-based eligible_branches
+      const branchCheckboxes = document.querySelectorAll('#edit-branch-selector input[type="checkbox"]');
+      if (job.eligible_branches) {
+        const branches = job.eligible_branches.split(',').map(b => b.trim());
+        branchCheckboxes.forEach(checkbox => {
+          checkbox.checked = branches.includes(checkbox.value);
+        });
+      } else {
+        branchCheckboxes.forEach(checkbox => checkbox.checked = false);
+      }
+      
+      document.getElementById('edit-description').value = job.description || '';
+      document.getElementById('edit-requirements').value = job.requirements || '';
+      
+      document.getElementById('edit-job-modal').style.display = 'flex';
+    };
+
+    window.closeEditModal = () => {
+      document.getElementById('edit-job-modal').style.display = 'none';
+    };
+
+    // Handle edit form submission
+    document.getElementById('edit-job-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const payload = Object.fromEntries(formData.entries());
+      
+      // Handle checkbox-based eligible_branches
+      const branchCheckboxes = document.querySelectorAll('#edit-branch-selector input[type="checkbox"]:checked');
+      const selectedBranches = Array.from(branchCheckboxes).map(cb => cb.value);
+      payload.eligible_branches = selectedBranches.join(', ');
+      
+      payload.min_cgpa = parseFloat(payload.min_cgpa || '0') || 0;
+      const jobId = document.getElementById('edit-job-id').value;
+      
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Updating...';
+      
+      try {
+        await api(`/company/jobs/${jobId}`, { method: 'PUT', body: payload });
+        showToast('Job updated successfully', 'success');
+        closeEditModal();
+        await loadAll();
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Update Job';
+      }
+    });
+
+    // Delete job
+    let jobToDelete = null;
+    
+    window.deleteJob = (jobId) => {
+      const job = jobs.find(j => j.id === jobId);
+      if (!job) return;
+      
+      jobToDelete = jobId;
+      document.getElementById('delete-job-title').textContent = `Are you sure you want to delete "${job.title}"?`;
+      document.getElementById('delete-job-modal').style.display = 'flex';
+    };
+
+    window.closeDeleteModal = () => {
+      document.getElementById('delete-job-modal').style.display = 'none';
+      jobToDelete = null;
+    };
+
+    window.confirmDeleteJob = async () => {
+      if (!jobToDelete) return;
+      
+      try {
+        await api(`/company/jobs/${jobToDelete}`, { method: 'DELETE' });
+        showToast('Job deleted successfully', 'success');
+        closeDeleteModal();
+        await loadAll();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    };
+  </script>
+</body>
+</html>
