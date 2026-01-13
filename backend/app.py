@@ -10,6 +10,7 @@ from models import HiringRound, ApplicationRound, OfferLetter
 from sqlalchemy import func, or_, and_
 import openpyxl
 from io import BytesIO
+from werkzeug.exceptions import HTTPException
 
 # Load environment variables from the backend directory
 env_path = Path(__file__).parent / '.env'
@@ -1280,6 +1281,11 @@ def internal_error(error):
 @app.errorhandler(Exception)
 def handle_exception(error):
     """Handle all uncaught exceptions"""
+    # Preserve HTTP errors (e.g., 404/405) with their correct status codes.
+    # Without this, Werkzeug HTTPExceptions can be converted into 500s.
+    if isinstance(error, HTTPException):
+        return jsonify({'error': error.description}), error.code
+
     db.session.rollback()
     return jsonify({'error': str(error)}), 500
 
