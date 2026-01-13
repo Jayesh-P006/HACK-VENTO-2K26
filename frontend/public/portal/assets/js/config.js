@@ -5,9 +5,8 @@ const getApiBase = () => {
     return 'http://localhost:5000/api';
   }
   
-  // Production: Use environment variable or deployed backend URL
-  // REPLACE THIS URL after deploying backend to Railway
-  return 'https://your-backend-url.up.railway.app/api';
+  // Production: Use deployed Railway backend URL
+  return 'https://hack-vento-2k26-production.up.railway.app/api';
 };
 
 const API_BASE = getApiBase();

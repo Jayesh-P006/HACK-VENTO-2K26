@@ -3,7 +3,7 @@ const getApiBase = () => {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return 'http://localhost:5000/api';
   }
-  return 'https://your-backend-url.up.railway.app/api'; // UPDATE after Railway deployment
+  return 'https://hack-vento-2k26-production.up.railway.app/api';
 };
 
 const API_BASE = getApiBase();

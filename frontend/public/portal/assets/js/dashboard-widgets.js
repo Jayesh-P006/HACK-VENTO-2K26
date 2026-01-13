@@ -8,7 +8,7 @@ class DashboardManager {
     this.auth = auth;
     this.API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
       ? 'http://localhost:5000/api' 
-      : 'https://your-backend-url.up.railway.app/api'; // UPDATE after Railway deployment
+      : 'https://hack-vento-2k26-production.up.railway.app/api';
     this.widgets = {};
     this.cache = {};
   }
