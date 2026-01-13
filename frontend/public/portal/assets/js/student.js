@@ -1,4 +1,4 @@
-import { requireRole, api, showToast, hydrateUserBadge, attachLogout, setGreeting, animateStagger } from './app.js';
+import { requireRole, api, API_BASE, showToast, hydrateUserBadge, attachLogout, setGreeting, animateStagger } from './app.js';
 
 const auth = requireRole([1]);
 if (!auth) return;
@@ -297,7 +297,7 @@ resumeUploadInput.addEventListener('change', async (e) => {
     formData.append('resume', file);
 
     const token = localStorage.getItem('token');
-    const response = await fetch('http://localhost:5000/api/student/upload-resume', {
+    const response = await fetch(`${API_BASE}/student/upload-resume`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`

@@ -6,7 +6,7 @@ const getApiBase = () => {
   return 'https://hack-vento-2k26-production.up.railway.app/api';
 };
 
-const API_BASE = getApiBase();
+export const API_BASE = getApiBase();
 
 const toastStackId = 'toast-stack';
 
