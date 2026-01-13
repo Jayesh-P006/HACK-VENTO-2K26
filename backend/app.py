@@ -11,6 +11,7 @@ from sqlalchemy import func, or_, and_
 import openpyxl
 from io import BytesIO
 from werkzeug.exceptions import HTTPException
+from sqlalchemy import inspect
 
 # Load environment variables from the backend directory
 env_path = Path(__file__).parent / '.env'
@@ -30,6 +31,58 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 db.init_app(app)
 CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
 jwt = JWTManager(app)
+
+
+def _maybe_init_database():
+    """Create tables (and demo users) if database is empty.
+
+    This is primarily for hosted environments like Railway where the MySQL
+    database starts empty and interactive shell access may be limited.
+    """
+    try:
+        with app.app_context():
+            inspector = inspect(db.engine)
+            has_users_table = inspector.has_table('users')
+
+            if not has_users_table:
+                print('[db] users table missing; creating all tables...')
+                db.create_all()
+
+            seed = os.getenv('SEED_DEMO_USERS', '1').strip().lower() in ('1', 'true', 'yes', 'y', 'on')
+            if not seed:
+                return
+
+            # Seed demo users only if there are no users yet.
+            if has_users_table and User.query.count() > 0:
+                return
+
+            print('[db] seeding demo users...')
+            demo_accounts = [
+                ('admin@university.edu', 'admin123', 3),
+                ('student@university.edu', 'student123', 1),
+                ('company@tech.com', 'company123', 2),
+            ]
+
+            for email, password, role_id in demo_accounts:
+                existing = User.query.filter_by(email=email).first()
+                if existing:
+                    continue
+                user = User(email=email, role_id=role_id, is_verified=True)
+                user.set_password(password)
+                db.session.add(user)
+            db.session.commit()
+            print('[db] demo users ready')
+    except Exception as e:
+        # Don't block app startup; surface in logs.
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        print('[db] init skipped/failed:', str(e))
+
+
+# Run DB init on startup (safe/idempotent)
+_maybe_init_database()
 
 # Helper function to get user ID from JWT
 def get_user_id():
