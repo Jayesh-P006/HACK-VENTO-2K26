@@ -6,6 +6,19 @@
 const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
   ? 'http://localhost:5000/api'
   : 'https://hack-vento-2k26-production.up.railway.app/api';
+
+async function readJsonSafe(response) {
+    const contentType = response.headers?.get?.('content-type') || '';
+    if (contentType.includes('application/json')) {
+        return await response.json();
+    }
+    const text = await response.text();
+    try {
+        return JSON.parse(text);
+    } catch (_) {
+        return { error: text };
+    }
+}
 let currentStep = 1;
 let jobData = null;
 let rounds = [];
@@ -53,7 +66,7 @@ async function loadJobDetails() {
         
         if (!response.ok) throw new Error('Failed to load job details');
         
-        const data = await response.json();
+        const data = await readJsonSafe(response);
         // Find the specific job (data is already an array of jobs)
         jobData = data.find(job => job.id == jobId);
         
@@ -84,7 +97,7 @@ async function loadExistingRounds() {
         });
         
         if (response.ok) {
-            const data = await response.json();
+            const data = await readJsonSafe(response);
             if (data.rounds && data.rounds.length > 0) {
                 rounds = data.rounds;
                 renderRounds();
@@ -590,7 +603,7 @@ async function submitConfiguration() {
             throw new Error('Cannot connect to server. Please ensure the backend is running on http://localhost:5000');
         });
         
-        const data = await response.json();
+        const data = await readJsonSafe(response);
         
         console.log('API Response:', {
             status: response.status,

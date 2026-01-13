@@ -306,12 +306,23 @@ resumeUploadInput.addEventListener('change', async (e) => {
       body: formData
     });
 
+    const readJsonSafe = async (res) => {
+      const contentType = res.headers?.get?.('content-type') || '';
+      if (contentType.includes('application/json')) return await res.json();
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch (_) {
+        return { error: text };
+      }
+    };
+
     if (!response.ok) {
-      const error = await response.json();
+      const error = await readJsonSafe(response);
       throw new Error(error.error || 'Upload failed');
     }
 
-    const result = await response.json();
+    const result = await readJsonSafe(response);
     showToast(result.message, 'success');
     
     // Update resume status
