@@ -207,7 +207,8 @@ function updateResumeStatus(resumeUrl) {
   if (resumeUrl) {
     resumeStatus.textContent = '✅ Resume uploaded';
     resumeStatus.style.color = '#10b981';
-    resumeLink.href = 'http://localhost:5000' + resumeUrl;
+    const apiOrigin = API_BASE.replace(/\/?api\/?$/, '');
+    resumeLink.href = apiOrigin + resumeUrl;
     resumeLink.style.display = 'inline-block';
   } else {
     resumeStatus.textContent = 'No resume uploaded yet';
