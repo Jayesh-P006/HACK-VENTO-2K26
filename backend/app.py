@@ -1257,6 +1257,31 @@ Experience Required: Check description
 
 # ==================== Health Check ====================
 
+@app.route('/', methods=['GET'])
+def root():
+    """Root endpoint for browsers/uptime checks."""
+    return jsonify({
+        'status': 'ok',
+        'message': 'Placement Portal API is running',
+        'health': '/api/health',
+    }), 200
+
+
+@app.route('/api', methods=['GET'])
+def api_root():
+    """API root endpoint to avoid confusing 404s when visiting /api."""
+    return jsonify({
+        'status': 'ok',
+        'message': 'Placement Portal API',
+        'health': '/api/health',
+    }), 200
+
+
+@app.route('/favicon.ico', methods=['GET'])
+def favicon():
+    """Avoid noisy 404s in browser consoles."""
+    return ('', 204)
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
