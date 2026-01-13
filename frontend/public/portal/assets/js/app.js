@@ -1,4 +1,12 @@
-const API_BASE = 'http://localhost:5000/api';
+// Import API configuration
+const getApiBase = () => {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5000/api';
+  }
+  return 'https://your-backend-url.up.railway.app/api'; // UPDATE after Railway deployment
+};
+
+const API_BASE = getApiBase();
 
 const toastStackId = 'toast-stack';
 

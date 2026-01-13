@@ -6,7 +6,9 @@
 class DashboardManager {
   constructor(auth) {
     this.auth = auth;
-    this.API_BASE = 'http://localhost:5000/api';
+    this.API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
+      ? 'http://localhost:5000/api' 
+      : 'https://your-backend-url.up.railway.app/api'; // UPDATE after Railway deployment
     this.widgets = {};
     this.cache = {};
   }

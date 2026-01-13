@@ -3,7 +3,9 @@
  * Handles multi-step form, drag-and-drop, validation, and API integration
  */
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:5000/api'
+  : 'https://your-backend-url.up.railway.app/api'; // UPDATE after Railway deployment
 let currentStep = 1;
 let jobData = null;
 let rounds = [];
