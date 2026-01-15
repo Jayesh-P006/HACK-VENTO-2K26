@@ -335,13 +335,13 @@ RESUME - {student.full_name}
 
 Contact Information:
 Email: {student.user.email if student.user else 'N/A'}
-Phone: {student.phone}
-Branch: {student.branch}
+Phone: {student.phone or 'N/A'}
+Branch: {student.branch or 'N/A'}
 
-CGPA: {student.cgpa}
-Graduation Year: {student.graduation_year}
+CGPA: {student.cgpa if student.cgpa else 'N/A'}
+Graduation Year: {student.graduation_year or 'N/A'}
 
-Skills: {student.skills}
+Skills: {student.skills if student.skills else 'Not specified'}
 """.encode('utf-8')
                 
                 zip_file.writestr(f'{student.full_name}_{student.enrollment_number}_resume.txt', resume_content)

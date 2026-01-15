@@ -70,6 +70,33 @@ def _maybe_init_database():
                 user = User(email=email, role_id=role_id, is_verified=True)
                 user.set_password(password)
                 db.session.add(user)
+                db.session.flush()  # Get user.id
+                
+                # Create role-specific profiles
+                if role_id == 1:  # Student
+                    from models import Student
+                    student = Student(
+                        user_id=user.id,
+                        full_name='Demo Student',
+                        enrollment_number='DEMO2026001',
+                        branch='CSE',
+                        cgpa=8.5,
+                        graduation_year=2026,
+                        current_year=3,
+                        phone='9999999999'
+                    )
+                    db.session.add(student)
+                elif role_id == 2:  # Company
+                    from models import Company
+                    company = Company(
+                        user_id=user.id,
+                        company_name='Demo Tech Corp',
+                        industry='Technology',
+                        hr_name='Demo HR',
+                        hr_phone='8888888888'
+                    )
+                    db.session.add(company)
+                    
             db.session.commit()
             print('[db] demo users ready')
     except Exception as e:
@@ -81,8 +108,59 @@ def _maybe_init_database():
         print('[db] init skipped/failed:', str(e))
 
 
+def _fix_existing_demo_accounts():
+    """Fix existing demo accounts that don't have student/company profiles"""
+    try:
+        with app.app_context():
+            fixed_any = False
+            
+            # Fix student account
+            student_user = User.query.filter_by(email='student@university.edu').first()
+            if student_user and not student_user.student:
+                print('[db] Fixing student profile for student@university.edu...')
+                from models import Student
+                student = Student(
+                    user_id=student_user.id,
+                    full_name='Demo Student',
+                    enrollment_number='DEMO2026001',
+                    branch='CSE',
+                    cgpa=8.5,
+                    graduation_year=2026,
+                    current_year=3,
+                    phone='9999999999'
+                )
+                db.session.add(student)
+                fixed_any = True
+            
+            # Fix company account
+            company_user = User.query.filter_by(email='company@tech.com').first()
+            if company_user and not company_user.company:
+                print('[db] Fixing company profile for company@tech.com...')
+                from models import Company
+                company = Company(
+                    user_id=company_user.id,
+                    company_name='Demo Tech Corp',
+                    industry='Technology',
+                    hr_name='Demo HR',
+                    hr_phone='8888888888'
+                )
+                db.session.add(company)
+                fixed_any = True
+            
+            if fixed_any:
+                db.session.commit()
+                print('[db] Demo account profiles fixed')
+    except Exception as e:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        print('[db] fix demo accounts failed:', str(e))
+
+
 # Run DB init on startup (safe/idempotent)
 _maybe_init_database()
+_fix_existing_demo_accounts()
 
 # Helper function to get user ID from JWT
 def get_user_id():
@@ -507,7 +585,11 @@ def get_student_applications():
         if user.role_id != 1:
             return jsonify({'error': 'Unauthorized'}), 403
         
-        applications = user.student.applications
+        student = user.student
+        if not student:
+            return jsonify({'error': 'Student profile not found'}), 404
+            
+        applications = student.applications
         # Serialize with dynamic round progress
         payload = [serialize_application(app) for app in applications]
         return jsonify(payload), 200
@@ -887,13 +969,15 @@ def export_applicants(job_id):
         # Data
         for app in applications:
             student = app.student
+            if not student:
+                continue  # Skip applications without student profiles
             ws.append([
                 student.full_name,
                 student.enrollment_number,
-                student.branch,
-                float(student.cgpa),
-                student.phone,
-                student.user.email,
+                student.branch or 'N/A',
+                float(student.cgpa) if student.cgpa else 0.0,
+                student.phone or 'N/A',
+                student.user.email if student.user else 'N/A',
                 app.status,
                 app.applied_at.strftime('%Y-%m-%d')
             ])

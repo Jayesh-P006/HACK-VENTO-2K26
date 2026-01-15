@@ -103,6 +103,10 @@ def generate_learning_roadmap():
         if user.role_id != 1:
             return jsonify({'error': 'Unauthorized'}), 403
         
+        student = user.student
+        if not student:
+            return jsonify({'error': 'Student profile not found'}), 404
+        
         data = request.json
         application_id = data.get('application_id')
         
@@ -111,12 +115,11 @@ def generate_learning_roadmap():
         
         # Get application details
         application = Application.query.get(application_id)
-        if not application or application.student_id != user.student.id:
+        if not application or application.student_id != student.id:
             return jsonify({'error': 'Application not found'}), 404
         
         job = application.job
         company = job.company
-        student = user.student
         
         # Calculate days remaining
         days_remaining = "Not specified"
@@ -132,10 +135,10 @@ def generate_learning_roadmap():
         student_context = f"""
 Student Profile:
 - Name: {student.full_name}
-- Branch: {student.branch}
-- CGPA: {student.cgpa}
+- Branch: {student.branch if student.branch else 'Not specified'}
+- CGPA: {student.cgpa if student.cgpa else 'Not specified'}
 - Current Status: {application.status}
-- Skills: {student.skills if hasattr(student, 'skills') else 'Not specified'}
+- Skills: {student.skills if hasattr(student, 'skills') and student.skills else 'Not specified'}
 """
         
         job_context = f"""
