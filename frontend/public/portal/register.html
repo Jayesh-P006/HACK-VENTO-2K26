@@ -191,9 +191,17 @@
     </div>
   </main>
   <script>
+    // ⚠️ CRITICAL DEBUG - This should appear IMMEDIATELY
+    console.log('🚀 SCRIPT LOADED - Register.html JavaScript is executing!');
+    console.log('🔍 Current URL:', window.location.href);
+    console.log('🔍 Hostname:', window.location.hostname);
+    
     const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
       ? 'http://localhost:5000/api'
       : 'https://hack-vento-2k26-production.up.railway.app/api';
+    
+    console.log('🔍 API_BASE set to:', API_BASE);
+    
     function showToast(msg, type = 'info') {
       let stack = document.getElementById('toast-stack');
       if (!stack) {
@@ -209,43 +217,62 @@
       setTimeout(() => toast.remove(), 4200);
     }
 
-    const form = document.querySelector('#register-form');
-    const roleRadios = document.querySelectorAll('input[name="role"]');
-    const studentFields = document.querySelector('[data-student-fields]');
-    const companyFields = document.querySelector('[data-company-fields]');
-    const adminFields = document.querySelector('[data-admin-fields]');
-    const submitBtn = document.querySelector('#register-submit');
-
-    // Debug log
-    console.log('[REGISTER] Page loaded. API_BASE:', API_BASE);
-    console.log('[REGISTER] Form element:', form);
-    console.log('[REGISTER] Submit button:', submitBtn);
-
-    function currentRole() {
-      const checked = Array.from(roleRadios).find(r => r.checked);
-      return checked ? parseInt(checked.value, 10) : 1;
-    }
-
-    function toggleFields() {
-      const role = currentRole();
-      studentFields?.classList.add('hidden');
-      companyFields?.classList.add('hidden');
-      adminFields?.classList.add('hidden');
+    // Wait for DOM to be fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('✅ DOMContentLoaded event fired');
       
-      if (role === 1) {
-        studentFields?.classList.remove('hidden');
-      } else if (role === 2) {
-        companyFields?.classList.remove('hidden');
-      } else if (role === 3) {
-        adminFields?.classList.remove('hidden');
+      const form = document.querySelector('#register-form');
+      const roleRadios = document.querySelectorAll('input[name="role"]');
+      const studentFields = document.querySelector('[data-student-fields]');
+      const companyFields = document.querySelector('[data-company-fields]');
+      const adminFields = document.querySelector('[data-admin-fields]');
+      const submitBtn = document.querySelector('#register-submit');
+
+      // Debug log
+      console.log('[REGISTER] ========================================');
+      console.log('[REGISTER] Page loaded. API_BASE:', API_BASE);
+      console.log('[REGISTER] Form element:', form);
+      console.log('[REGISTER] Submit button:', submitBtn);
+      console.log('[REGISTER] Role radios count:', roleRadios.length);
+      console.log('[REGISTER] ========================================');
+      
+      if (!form) {
+        console.error('❌ CRITICAL: Form #register-form not found!');
+        alert('ERROR: Form not found! Check console.');
+        return;
       }
-    }
+      
+      if (!submitBtn) {
+        console.error('❌ CRITICAL: Submit button #register-submit not found!');
+        alert('ERROR: Submit button not found! Check console.');
+        return;
+      }
 
-    roleRadios.forEach(r => r.addEventListener('change', toggleFields));
-    toggleFields();
+      function currentRole() {
+        const checked = Array.from(roleRadios).find(r => r.checked);
+        return checked ? parseInt(checked.value, 10) : 1;
+      }
 
-    // Fetch active batches for the dropdown
-    async function loadBatches() {
+      function toggleFields() {
+        const role = currentRole();
+        studentFields?.classList.add('hidden');
+        companyFields?.classList.add('hidden');
+        adminFields?.classList.add('hidden');
+        
+        if (role === 1) {
+          studentFields?.classList.remove('hidden');
+        } else if (role === 2) {
+          companyFields?.classList.remove('hidden');
+        } else if (role === 3) {
+          adminFields?.classList.remove('hidden');
+        }
+      }
+
+      roleRadios.forEach(r => r.addEventListener('change', toggleFields));
+      toggleFields();
+
+      // Fetch active batches for the dropdown
+      async function loadBatches() {
       try {
         console.log('[REGISTER] Loading batches from:', `${API_BASE}/batches/active`);
         const response = await fetch(`${API_BASE}/batches/active`, {
@@ -283,9 +310,11 @@
     loadBatches();
 
     if (form) {
+      console.log('[REGISTER] 🎯 Attaching form submit event listener...');
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        console.log('[REGISTER] Form submit event triggered');
+        console.log('[REGISTER] 🔥🔥🔥 FORM SUBMIT EVENT TRIGGERED! 🔥🔥🔥');
+        console.log('[REGISTER] Event object:', e);
         
         const formData = new FormData(form);
         const role = currentRole();
@@ -431,9 +460,25 @@
           submitBtn.textContent = 'Create Account';
         }
       });
-    } else {
-      console.error('[REGISTER] Form element not found!');
-    }
+      } else {
+        console.error('❌ CRITICAL: Form is null! Cannot attach event listener!');
+        alert('CRITICAL ERROR: Form not found!');
+      }
+      
+      // Also add direct button click listener as backup
+      if (submitBtn) {
+        submitBtn.addEventListener('click', function(e) {
+          console.log('[REGISTER] 🔴 DIRECT BUTTON CLICK DETECTED!');
+          console.log('[REGISTER] Button clicked directly (not via form submit)');
+        });
+      }
+      
+      console.log('[REGISTER] ✅ Event listeners attached successfully');
+      
+    }); // End DOMContentLoaded
+    
+    // Additional diagnostics
+    console.log('🔍 Script execution completed. Waiting for DOMContentLoaded...');
   </script>
 </body>
 </html>

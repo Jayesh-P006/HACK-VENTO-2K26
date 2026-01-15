@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Registration Debug Test</title>
+  <style>
+    body { font-family: Arial; padding: 20px; background: #1a1a2e; color: #fff; }
+    .log { background: #16213e; padding: 10px; margin: 5px 0; border-radius: 5px; font-family: monospace; }
+    .success { color: #4CAF50; }
+    .error { color: #f44336; }
+    .warning { color: #ff9800; }
+    button { padding: 15px 30px; font-size: 16px; cursor: pointer; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; margin: 10px 0; }
+    button:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <h1>🔍 Registration System Debug Test</h1>
+  <p>This page tests if JavaScript is working properly</p>
+  
+  <div id="logs"></div>
+  
+  <form id="test-form">
+    <input type="text" id="test-input" placeholder="Type something..." style="padding: 10px; width: 300px; border-radius: 5px; border: 1px solid #ccc;">
+    <button type="submit" id="test-submit">Test Submit</button>
+  </form>
+  
+  <button id="direct-click-test">Direct Click Test</button>
+  <button id="api-test">Test API Connection</button>
+  
+  <script>
+    const logs = document.getElementById('logs');
+    
+    function log(message, type = 'success') {
+      console.log(message);
+      const div = document.createElement('div');
+      div.className = `log ${type}`;
+      div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logs.appendChild(div);
+      logs.scrollTop = logs.scrollHeight;
+    }
+    
+    log('✅ Script loaded successfully', 'success');
+    log('Current URL: ' + window.location.href, 'success');
+    
+    const form = document.getElementById('test-form');
+    const submitBtn = document.getElementById('test-submit');
+    const directBtn = document.getElementById('direct-click-test');
+    const apiBtn = document.getElementById('api-test');
+    
+    log('Form found: ' + (form ? 'YES ✓' : 'NO ✗'), form ? 'success' : 'error');
+    log('Submit button found: ' + (submitBtn ? 'YES ✓' : 'NO ✗'), submitBtn ? 'success' : 'error');
+    
+    if (form) {
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        log('🔥 FORM SUBMIT TRIGGERED!', 'success');
+        const input = document.getElementById('test-input');
+        log('Input value: ' + input.value, 'success');
+      });
+      log('✅ Form submit listener attached', 'success');
+    }
+    
+    if (directBtn) {
+      directBtn.addEventListener('click', function() {
+        log('🔴 Direct button click detected!', 'warning');
+      });
+      log('✅ Direct click listener attached', 'success');
+    }
+    
+    if (apiBtn) {
+      apiBtn.addEventListener('click', async function() {
+        log('Testing API connection...', 'warning');
+        const API_BASE = 'http://localhost:5000/api';
+        try {
+          const response = await fetch(`${API_BASE}/batches/active`);
+          log(`API Response: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+          if (response.ok) {
+            const data = await response.json();
+            log(`Data received: ${JSON.stringify(data)}`, 'success');
+          }
+        } catch (err) {
+          log(`API Error: ${err.message}`, 'error');
+        }
+      });
+      log('✅ API test listener attached', 'success');
+    }
+    
+    log('==========================================', 'success');
+    log('All listeners attached. Try clicking buttons!', 'success');
+    log('==========================================', 'success');
+  </script>
+</body>
+</html>
