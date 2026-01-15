@@ -25,6 +25,37 @@ def check_admin(user_id):
     return user and user.role_id == 3
 
 
+def _normalize_skills(skills_text):
+    if not skills_text:
+        return []
+    raw = [s.strip() for s in skills_text.replace('\n', ',').replace(';', ',').split(',')]
+    cleaned = [s for s in raw if s]
+    seen = set()
+    result = []
+    for s in cleaned:
+        key = s.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(s)
+    return result
+
+
+def _sync_skill_master():
+    """Ensure master Skill entries exist for all skills mentioned by students."""
+    added = 0
+    for student in Student.query.with_entities(Student.skills).all():
+        for skill_name in _normalize_skills(student.skills):
+            existing = Skill.query.filter(func.lower(Skill.name) == skill_name.lower()).first()
+            if existing:
+                continue
+            db.session.add(Skill(name=skill_name, category='Other', description='', is_active=True))
+            added += 1
+    if added:
+        db.session.commit()
+    return added
+
+
 @admin_bp.route('/company-progress', methods=['GET'])
 @jwt_required()
 def get_company_progress():
@@ -162,6 +193,8 @@ def get_students_list():
             return jsonify({'error': 'Unauthorized'}), 403
 
         branch = request.args.get('branch')
+        batch_id = request.args.get('batch_id', type=int)
+        skill = request.args.get('skill')
 
         latest_offer_subq = db.session.query(
             OfferLetter.student_id.label('student_id'),
@@ -188,10 +221,19 @@ def get_students_list():
             else:
                 q = q.filter(Student.branch == branch)
 
+        if batch_id:
+            q = q.filter(Student.batch_id == batch_id)
+
         q = q.order_by(Student.full_name.asc())
 
         data = []
-        for s, email, annual_ctc in q.all():
+        rows = q.all()
+
+        if skill:
+            skill_lower = skill.lower()
+            rows = [r for r in rows if skill_lower in ' '.join(_normalize_skills(r[0].skills)).lower()]
+
+        for s, email, annual_ctc in rows:
             package = float(annual_ctc) if annual_ctc is not None else 0
             placed = package > 0 or annual_ctc is not None
             data.append({
@@ -200,13 +242,42 @@ def get_students_list():
                 'email': email,
                 'enrollment_number': s.enrollment_number,
                 'branch': s.branch,
+                'batch_id': s.batch_id,
+                'batch_code': s.batch.batch_code if s.batch else None,
                 'cgpa': float(s.cgpa) if s.cgpa else 0,
+                'skills': _normalize_skills(s.skills),
                 'placement_status': 'Placed' if placed else 'Unplaced',
                 'package_lpa': package
             })
 
         return jsonify({'success': True, 'data': data}), 200
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/students/<int:student_id>', methods=['DELETE'])
+@jwt_required()
+def delete_student(student_id):
+    """Delete a student and their user account (Admin only)."""
+    try:
+        user_id = get_user_id()
+        if not check_admin(user_id):
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        student = Student.query.get(student_id)
+        if not student:
+            return jsonify({'error': 'Student not found'}), 404
+
+        user = User.query.get(student.user_id)
+        if user:
+            db.session.delete(user)
+        else:
+            db.session.delete(student)
+
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Student removed successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 # ==================== STUDENT VERIFICATION ENDPOINTS ====================
@@ -259,6 +330,9 @@ def approve_student_verification(verification_id):
         verification = StudentVerification.query.get(verification_id)
         if not verification:
             return jsonify({'error': 'Verification record not found'}), 404
+
+        if not verification.otp_verified:
+            return jsonify({'error': 'Email not verified. Ask the student to complete OTP verification first.'}), 400
         
         # Update verification status
         verification.status = 'Verified'
@@ -274,6 +348,7 @@ def approve_student_verification(verification_id):
         db.session.commit()
         
         # Send welcome email after successful approval
+        email_sent = False
         try:
             from email_service import send_welcome_email
             send_welcome_email(
@@ -281,13 +356,15 @@ def approve_student_verification(verification_id):
                 full_name=verification.student.full_name,
                 role="Student"
             )
+            email_sent = True
             print(f"✉️ Welcome email sent to {user.email}")
         except Exception as email_error:
             print(f"⚠️ Email send failed (but approval succeeded): {str(email_error)}")
         
         return jsonify({
             'success': True,
-            'message': f"Student {verification.student.full_name} verified successfully. Welcome email sent!"
+            'message': f"Student {verification.student.full_name} verified successfully." + (" Welcome email sent!" if email_sent else " Email failed to send."),
+            'email_sent': email_sent
         }), 200
     except Exception as e:
         db.session.rollback()
@@ -547,11 +624,24 @@ def get_skills():
         user_id = get_user_id()
         if not check_admin(user_id):
             return jsonify({'error': 'Unauthorized'}), 403
-        
+
+        _sync_skill_master()
+
         skills = Skill.query.all()
+        counts = {}
+        for student in Student.query.with_entities(Student.skills).all():
+            for s in _normalize_skills(student.skills):
+                key = s.lower()
+                counts[key] = counts.get(key, 0) + 1
         return jsonify({
             'success': True,
-            'data': [s.to_dict() for s in skills]
+            'data': [
+                {
+                    **s.to_dict(),
+                    'student_count': counts.get(s.name.lower(), 0)
+                }
+                for s in skills
+            ]
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500

@@ -5,7 +5,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
-from models import db, User, Student, Company, Job, Application, Announcement, StudentVerification
+from models import db, User, Student, Company, Job, Application, Announcement, StudentVerification, Skill
 from otp_service import generate_otp, send_otp_email, is_otp_valid, send_approval_pending_email
 from models import HiringRound, ApplicationRound, OfferLetter, Batch, Admin, AdminVerification, AdminAccessLog, Department
 from sqlalchemy import func, or_, and_, text
@@ -168,6 +168,37 @@ def _maybe_init_database():
         except Exception:
             pass
         print('[db] init skipped/failed:', str(e))
+
+
+def _normalize_skills(skills_text):
+    if not skills_text:
+        return []
+    raw = [s.strip() for s in skills_text.replace('\n', ',').replace(';', ',').split(',')]
+    cleaned = [s for s in raw if s]
+    # Deduplicate case-insensitively, preserve original casing for first occurrence
+    seen = set()
+    result = []
+    for s in cleaned:
+        key = s.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(s)
+    return result
+
+
+def _sync_skill_master_from_student(skills_text):
+    """Ensure master Skill entries exist for all skills in the student profile."""
+    try:
+        for skill_name in _normalize_skills(skills_text):
+            existing = Skill.query.filter(func.lower(Skill.name) == skill_name.lower()).first()
+            if existing:
+                continue
+            skill = Skill(name=skill_name, category='Other', description='', is_active=True)
+            db.session.add(skill)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def _fix_existing_demo_accounts():
@@ -447,6 +478,7 @@ def register():
             verification_record = AdminVerification.query.filter_by(admin_id=user.admin.id).first()
         
         # Generate and store OTP
+        email_sent = None
         if verification_record:
             otp = generate_otp()
             verification_record.otp = otp
@@ -457,15 +489,16 @@ def register():
             print(f'[REGISTER] OTP generated and stored: {otp}')
             
             # Send OTP email
-            send_otp_email(data['email'], full_name, otp)
-            print(f'[REGISTER] OTP email sent to {data["email"]}')
+            email_sent = send_otp_email(data['email'], full_name, otp)
+            print(f'[REGISTER] OTP email sent to {data["email"]}: {email_sent}')
         
         return jsonify({
-            'message': f'Registration successful! OTP sent to {data["email"]}. Please verify your email.',
+            'message': f'Registration successful! OTP sent to {data["email"]}. Please verify your email.' if email_sent else 'Registration successful, but OTP email could not be sent. Please use Resend OTP.',
             'user': user.to_dict(),
             'role_type': role_type,
             'email': data['email'],
-            'next_step': 'otp_verification'
+            'next_step': 'otp_verification',
+            'otp_email_sent': bool(email_sent)
         }), 201
         
     except Exception as e:
@@ -679,6 +712,16 @@ def login():
         if not user or not user.check_password(data['password']):
             return jsonify({'error': 'Invalid email or password'}), 401
         
+        # Require OTP verification for student/admin accounts
+        if user.role_id in (1, 3):
+            verification_record = None
+            if user.role_id == 1 and user.student:
+                verification_record = StudentVerification.query.filter_by(student_id=user.student.id).first()
+            elif user.role_id == 3 and user.admin:
+                verification_record = AdminVerification.query.filter_by(admin_id=user.admin.id).first()
+            if not verification_record or not verification_record.otp_verified:
+                return jsonify({'error': 'Email not verified. Please complete OTP verification.'}), 403
+
         if not user.is_verified and user.role_id != 3:
             return jsonify({'error': 'Account not verified by admin'}), 403
         
@@ -739,6 +782,9 @@ def student_profile():
             student.profile_completed = True
         
         db.session.commit()
+
+        if data.get('skills'):
+            _sync_skill_master_from_student(data.get('skills'))
         return jsonify(student.to_dict()), 200
         
     except Exception as e:

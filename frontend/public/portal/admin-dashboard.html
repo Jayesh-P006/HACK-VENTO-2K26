@@ -552,9 +552,10 @@
                                         <th>CGPA</th>
                                         <th>Status</th>
                                         <th>Package (LPA)</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody id="branchStudentsBody"><tr><td colspan="6" class="empty-state">Select a branch</td></tr></tbody>
+                                <tbody id="branchStudentsBody"><tr><td colspan="7" class="empty-state">Select a branch</td></tr></tbody>
                             </table>
                         </div>
                     </div>
@@ -564,6 +565,30 @@
                             <button class="btn btn-ghost" onclick="openAddModal('batch')">+ Add Batch Year</button>
                         </div>
                         <div class="item-grid" id="batchesList"></div>
+
+                        <div id="batchStudentsPanel" class="branch-students-panel" style="display:none;">
+                            <div class="section-header" style="margin-top: 16px;">
+                                <div>
+                                    <h3 id="batchStudentsTitle" style="margin-bottom: 4px;">Batch Students</h3>
+                                    <div class="minor" id="batchStudentsSummary">Select a batch to view students</div>
+                                </div>
+                                <button class="btn btn-ghost" onclick="closeBatchStudents()">Close</button>
+                            </div>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Student</th>
+                                        <th>Email</th>
+                                        <th>Enrollment</th>
+                                        <th>Branch</th>
+                                        <th>CGPA</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="batchStudentsBody"><tr><td colspan="7" class="empty-state">Select a batch</td></tr></tbody>
+                            </table>
+                        </div>
                     </div>
                     <div id="master-skills" class="master-content">
                         <div class="section-header">
@@ -571,6 +596,30 @@
                             <button class="btn btn-ghost" onclick="openAddModal('skill')">+ Add Skill</button>
                         </div>
                         <div class="item-grid" id="skillsList"></div>
+
+                        <div id="skillStudentsPanel" class="branch-students-panel" style="display:none;">
+                            <div class="section-header" style="margin-top: 16px;">
+                                <div>
+                                    <h3 id="skillStudentsTitle" style="margin-bottom: 4px;">Skill Students</h3>
+                                    <div class="minor" id="skillStudentsSummary">Select a skill to view students</div>
+                                </div>
+                                <button class="btn btn-ghost" onclick="closeSkillStudents()">Close</button>
+                            </div>
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Student</th>
+                                        <th>Email</th>
+                                        <th>Enrollment</th>
+                                        <th>Branch</th>
+                                        <th>CGPA</th>
+                                        <th>Skills</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="skillStudentsBody"><tr><td colspan="7" class="empty-state">Select a skill</td></tr></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1176,9 +1225,11 @@
                 const batchList = document.getElementById('batchesList'); 
                 if (batchList && Array.isArray(batches)) { 
                     batchList.innerHTML = batches.map(b => `
-                        <div class="item-chip">
-                            <span>${b.batch_code}</span>
-                            <span class="minor">${b.start_year}-${b.end_year}</span>
+                        <div class="item-chip branch-chip" role="button" tabindex="0" data-batch-id="${b.id}" data-batch-code="${b.batch_code}" onclick="selectBatch(${b.id}, '${String(b.batch_code).replace(/'/g, "\\'")}')">
+                            <div style="display:flex; flex-direction:column; gap: 2px;">
+                                <span>${b.batch_code}</span>
+                                <span class="minor">${b.start_year}-${b.end_year} · ${b.degree}${b.program ? ` (${b.program})` : ''}</span>
+                            </div>
                             <span class="count-pill">${b.student_count || 0} students</span>
                         </div>
                     `).join(''); 
@@ -1195,10 +1246,21 @@
                 } catch(e2) {}
             }
             
-            try { const skills = await apiCall('/admin/skills'); const skillList = document.getElementById('skillsList'); if (skills.data) { skillList.innerHTML = skills.data.map(s => `<div class="item-chip"><span>${s.name}</span><span class="minor">${s.category || ''}</span></div>`).join(''); } } catch(e) {}
+            try { const skills = await apiCall('/admin/skills'); const skillList = document.getElementById('skillsList'); if (skills.data) { skillList.innerHTML = skills.data.map(s => `
+                <div class="item-chip branch-chip" role="button" tabindex="0" data-skill="${s.name}" onclick="selectSkill('${String(s.name).replace(/'/g, "\\'")}')">
+                    <div style="display:flex; flex-direction:column; gap: 2px;">
+                        <span>${s.name}</span>
+                        <span class="minor">${s.category || ''}</span>
+                    </div>
+                    <span class="count-pill">${s.student_count || 0} students</span>
+                </div>
+            `).join(''); } } catch(e) {}
         }
 
         let selectedBranchName = null;
+        let selectedBatchId = null;
+        let selectedBatchCode = null;
+        let selectedSkillName = null;
 
         function closeBranchStudents() {
             selectedBranchName = null;
@@ -1254,13 +1316,161 @@
                             <td>${(s.cgpa ?? 0).toString()}</td>
                             <td>${statusBadge}</td>
                             <td>${pkgText}</td>
+                            <td>
+                                <button class="action-btn reject" onclick="removeStudent(${s.id}, '${String(s.full_name || 'Student').replace(/'/g, "\\'")}')">Remove</button>
+                            </td>
                         </tr>
                     `;
                 }).join('');
             } catch (e) {
                 console.error('Failed to load branch students:', e);
                 summary.textContent = 'Failed to load students';
-                body.innerHTML = '<tr><td colspan="6" class="empty-state">Failed to load students</td></tr>';
+                body.innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load students</td></tr>';
+            }
+        }
+
+        function closeBatchStudents() {
+            selectedBatchId = null;
+            selectedBatchCode = null;
+            document.querySelectorAll('[data-batch-id]').forEach(el => el.classList.remove('active'));
+            const panel = document.getElementById('batchStudentsPanel');
+            if (panel) panel.style.display = 'none';
+        }
+
+        async function selectBatch(batchId, batchCode) {
+            selectedBatchId = batchId;
+            selectedBatchCode = batchCode;
+            document.querySelectorAll('[data-batch-id]').forEach(el => {
+                el.classList.toggle('active', Number(el.getAttribute('data-batch-id')) === Number(batchId));
+            });
+
+            const panel = document.getElementById('batchStudentsPanel');
+            const title = document.getElementById('batchStudentsTitle');
+            const summary = document.getElementById('batchStudentsSummary');
+            const body = document.getElementById('batchStudentsBody');
+            if (!panel || !title || !summary || !body) return;
+
+            panel.style.display = 'block';
+            title.textContent = `${batchCode} Students`;
+            summary.textContent = 'Loading students...';
+            body.innerHTML = '<tr><td colspan="7" class="empty-state">Loading...</td></tr>';
+
+            try {
+                const res = await apiCall(`/admin/students?batch_id=${encodeURIComponent(batchId)}`);
+                const students = (res && res.data) ? res.data : [];
+                summary.textContent = `${students.length} registered students`;
+
+                if (students.length === 0) {
+                    body.innerHTML = '<tr><td colspan="7" class="empty-state">No students found for this batch</td></tr>';
+                    return;
+                }
+
+                body.innerHTML = students.map(s => {
+                    const status = (s.placement_status || 'Unplaced');
+                    const statusLower = status.toLowerCase();
+                    const statusBadge = statusLower === 'placed'
+                        ? '<span class="status-badge verified">Placed</span>'
+                        : '<span class="status-badge pending">Unplaced</span>';
+                    return `
+                        <tr>
+                            <td>${s.full_name || 'N/A'}</td>
+                            <td>${s.email || 'N/A'}</td>
+                            <td>${s.enrollment_number || 'N/A'}</td>
+                            <td>${s.branch || 'N/A'}</td>
+                            <td>${(s.cgpa ?? 0).toString()}</td>
+                            <td>${statusBadge}</td>
+                            <td>
+                                <button class="action-btn reject" onclick="removeStudent(${s.id}, '${String(s.full_name || 'Student').replace(/'/g, "\\'")}')">Remove</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Failed to load batch students:', e);
+                summary.textContent = 'Failed to load students';
+                body.innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load students</td></tr>';
+            }
+        }
+
+        function closeSkillStudents() {
+            selectedSkillName = null;
+            document.querySelectorAll('[data-skill]').forEach(el => el.classList.remove('active'));
+            const panel = document.getElementById('skillStudentsPanel');
+            if (panel) panel.style.display = 'none';
+        }
+
+        async function selectSkill(skillName) {
+            selectedSkillName = skillName;
+            document.querySelectorAll('[data-skill]').forEach(el => {
+                el.classList.toggle('active', el.getAttribute('data-skill') === skillName);
+            });
+
+            const panel = document.getElementById('skillStudentsPanel');
+            const title = document.getElementById('skillStudentsTitle');
+            const summary = document.getElementById('skillStudentsSummary');
+            const body = document.getElementById('skillStudentsBody');
+            if (!panel || !title || !summary || !body) return;
+
+            panel.style.display = 'block';
+            title.textContent = `${skillName} Students`;
+            summary.textContent = 'Loading students...';
+            body.innerHTML = '<tr><td colspan="7" class="empty-state">Loading...</td></tr>';
+
+            try {
+                const res = await apiCall(`/admin/students?skill=${encodeURIComponent(skillName)}`);
+                const students = (res && res.data) ? res.data : [];
+                summary.textContent = `${students.length} students with ${skillName}`;
+
+                if (students.length === 0) {
+                    body.innerHTML = '<tr><td colspan="7" class="empty-state">No students found for this skill</td></tr>';
+                    return;
+                }
+
+                body.innerHTML = students.map(s => {
+                    const skillsText = Array.isArray(s.skills) ? s.skills.join(', ') : (s.skills || '');
+                    return `
+                        <tr>
+                            <td>${s.full_name || 'N/A'}</td>
+                            <td>${s.email || 'N/A'}</td>
+                            <td>${s.enrollment_number || 'N/A'}</td>
+                            <td>${s.branch || 'N/A'}</td>
+                            <td>${(s.cgpa ?? 0).toString()}</td>
+                            <td>${skillsText || '-'}</td>
+                            <td>
+                                <button class="action-btn reject" onclick="removeStudent(${s.id}, '${String(s.full_name || 'Student').replace(/'/g, "\\'")}')">Remove</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Failed to load skill students:', e);
+                summary.textContent = 'Failed to load students';
+                body.innerHTML = '<tr><td colspan="7" class="empty-state">Failed to load students</td></tr>';
+            }
+        }
+
+        function confirmDouble(message1, message2) {
+            if (!confirm(message1)) return false;
+            return confirm(message2);
+        }
+
+        async function removeStudent(studentId, studentName) {
+            const ok = confirmDouble(
+                `Remove ${studentName}? This will permanently delete the account.`,
+                'Are you absolutely sure? This action cannot be undone.'
+            );
+            if (!ok) return;
+
+            try {
+                await apiCall(`/admin/students/${studentId}`, 'DELETE');
+                showToast('Student removed successfully', 'success');
+                // Refresh panels
+                if (selectedBranchName) selectBranch(selectedBranchName);
+                if (selectedBatchId) selectBatch(selectedBatchId, selectedBatchCode || 'Batch');
+                if (selectedSkillName) selectSkill(selectedSkillName);
+                loadMasterData();
+            } catch (e) {
+                showToast(e.message || 'Failed to remove student', 'error');
             }
         }
 
