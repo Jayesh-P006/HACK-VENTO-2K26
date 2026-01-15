@@ -38,6 +38,11 @@ from email_service import init_mail
 init_mail(app)
 
 
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'ok'}), 200
+
+
 def _maybe_init_database():
     """Create tables (and demo users) if database is empty.
 

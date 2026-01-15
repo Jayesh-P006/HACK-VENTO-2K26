@@ -366,11 +366,44 @@
     console.log('🔍 Current URL:', window.location.href);
     console.log('🔍 Hostname:', window.location.hostname);
     
-    const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    const DEFAULT_API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
       ? 'http://localhost:5000/api'
       : 'https://hack-vento-2k26-production.up.railway.app/api';
+    let API_BASE = localStorage.getItem('API_BASE') || DEFAULT_API_BASE;
     
-    console.log('🔍 API_BASE set to:', API_BASE);
+    console.log('🔍 API_BASE initial:', API_BASE);
+
+    async function pingApi(baseUrl) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch(`${baseUrl}/health`, { method: 'GET', signal: controller.signal });
+        clearTimeout(timeout);
+        return res.ok;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    async function resolveApiBase() {
+      const candidates = [];
+      if (API_BASE) candidates.push(API_BASE);
+      if (!candidates.includes(DEFAULT_API_BASE)) candidates.push(DEFAULT_API_BASE);
+      const originApi = `${window.location.origin}/api`;
+      if (!candidates.includes(originApi)) candidates.push(originApi);
+
+      for (const base of candidates) {
+        if (await pingApi(base)) {
+          API_BASE = base;
+          localStorage.setItem('API_BASE', API_BASE);
+          console.log('✅ API_BASE resolved to:', API_BASE);
+          return true;
+        }
+      }
+
+      console.warn('⚠️ API_BASE not reachable. Using:', API_BASE);
+      return false;
+    }
     
     function showToast(msg, type = 'info') {
       let stack = document.getElementById('toast-stack');
@@ -388,8 +421,10 @@
     }
 
     // Wait for DOM to be fully loaded
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', async function() {
       console.log('✅ DOMContentLoaded event fired');
+
+      await resolveApiBase();
       
       const form = document.querySelector('#register-form');
       const roleRadios = document.querySelectorAll('input[name="role"]');
@@ -707,7 +742,11 @@
             message: err.message,
             stack: err.stack
           });
-          showToast(err.message || 'Registration failed. Please check your connection and try again.', 'error');
+          if (String(err.message || '').toLowerCase().includes('failed to fetch')) {
+            showToast(`Backend not reachable. Check API_BASE: ${API_BASE}`, 'error');
+          } else {
+            showToast(err.message || 'Registration failed. Please check your connection and try again.', 'error');
+          }
           submitBtn.disabled = false;
           submitBtn.textContent = 'Create Account';
         }
