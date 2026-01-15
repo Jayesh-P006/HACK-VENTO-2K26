@@ -165,11 +165,181 @@
               </div>
             </div>
 
-            <button id="register-submit" class="btn btn-primary" type="submit" style="margin-top: 12px; padding: 14px;">Create Account</button>
+            <button id="register-submit" class="btn btn-primary animated-register-btn" type="submit" style="margin-top: 12px; padding: 0; height: 56px; position: relative; overflow: hidden;">
+              <span class="register-btn-text">Create Account</span>
+              <span class="register-btn-sparkles"></span>
+            </button>
           </form>
           <p class="minor" style="margin-top: 16px; text-align: center;">Already have an account? <a href="index.html" style="color: var(--accent-2); font-weight: 600;">Sign in</a></p>
         </div>
       </section>
+
+      <style>
+        /* Animated Register Button */
+        .animated-register-btn {
+          position: relative;
+          font-weight: 600;
+          font-size: 16px;
+          letter-spacing: 0.5px;
+          border: none;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          background: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%);
+          box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+        }
+
+        .animated-register-btn:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+          background: linear-gradient(135deg, #8b5cf6 0%, #4f46e5 100%);
+        }
+
+        .animated-register-btn:active:not(:disabled) {
+          transform: translateY(0px);
+        }
+
+        /* Sparkles effect during hover */
+        .register-btn-sparkles {
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          top: 0;
+          left: 0;
+          pointer-events: none;
+        }
+
+        .register-btn-sparkles::before,
+        .register-btn-sparkles::after {
+          content: '';
+          position: absolute;
+          width: 4px;
+          height: 4px;
+          background: #fff;
+          border-radius: 50%;
+          opacity: 0;
+        }
+
+        .animated-register-btn:hover .register-btn-sparkles::before {
+          animation: sparkle 0.6s ease-out infinite;
+          left: 20%;
+          top: 20%;
+        }
+
+        .animated-register-btn:hover .register-btn-sparkles::after {
+          animation: sparkle 0.6s ease-out 0.2s infinite;
+          right: 20%;
+          bottom: 20%;
+        }
+
+        @keyframes sparkle {
+          0% {
+            opacity: 1;
+            transform: translate(0, 0) scale(1);
+          }
+          100% {
+            opacity: 0;
+            transform: translate(var(--tx, 0px), var(--ty, -20px)) scale(0);
+          }
+        }
+
+        /* Loading state with shimmer */
+        .animated-register-btn:disabled {
+          cursor: not-allowed;
+          opacity: 0.9;
+          background: linear-gradient(90deg, #7c3aed 0%, #3b82f6 25%, #7c3aed 50%, #3b82f6 75%, #7c3aed 100%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s infinite;
+        }
+
+        @keyframes shimmer {
+          0% {
+            background-position: 200% 0;
+          }
+          100% {
+            background-position: -200% 0;
+          }
+        }
+
+        /* Text animation during loading */
+        .animated-register-btn:disabled .register-btn-text {
+          animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.7;
+          }
+        }
+
+        /* Success animation */
+        .animated-register-btn.success {
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+          animation: successPop 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        @keyframes successPop {
+          0% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.05);
+          }
+          100% {
+            transform: scale(1);
+          }
+        }
+
+        /* Ripple effect on click */
+        .animated-register-btn::before {
+          content: '';
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          width: 0;
+          height: 0;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.5);
+          transform: translate(-50%, -50%);
+          pointer-events: none;
+        }
+
+        .animated-register-btn:active::before {
+          animation: ripple 0.6s ease-out;
+        }
+
+        @keyframes ripple {
+          0% {
+            width: 0;
+            height: 0;
+            opacity: 1;
+          }
+          100% {
+            width: 300px;
+            height: 300px;
+            opacity: 0;
+          }
+        }
+
+        /* Confetti particles on success */
+        .confetti-particle {
+          position: fixed;
+          pointer-events: none;
+          font-size: 24px;
+          z-index: 9999;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+          .animated-register-btn {
+            font-size: 14px;
+            height: 48px;
+          }
+        }
+      </style>
 
       <section class="features-grid" style="margin-top: 60px;">
         <div class="feature-card">
@@ -309,7 +479,40 @@
     // Load batches on page load
     loadBatches();
 
-    if (form) {
+// Create confetti effect function
+      function createConfetti() {
+        const confettiPieces = ['🎉', '✨', '🎊', '⭐', '🌟', '💫', '🎯', '🚀'];
+        const buttonRect = submitBtn.getBoundingClientRect();
+        
+        for (let i = 0; i < 12; i++) {
+          const particle = document.createElement('div');
+          particle.className = 'confetti-particle';
+          particle.textContent = confettiPieces[Math.floor(Math.random() * confettiPieces.length)];
+          particle.style.left = (buttonRect.left + buttonRect.width / 2) + 'px';
+          particle.style.top = (buttonRect.top + buttonRect.height / 2) + 'px';
+          particle.style.animation = `fall-${i} 2s ease-out forwards`;
+          
+          const style = document.createElement('style');
+          style.textContent = `
+            @keyframes fall-${i} {
+              0% {
+                transform: translate(0, 0) rotate(0deg) scale(1);
+                opacity: 1;
+              }
+              100% {
+                transform: translate(${(Math.random() - 0.5) * 200}px, ${Math.random() * 200 + 100}px) rotate(${Math.random() * 360}deg) scale(0);
+                opacity: 0;
+              }
+            }
+          `;
+          document.head.appendChild(style);
+          document.body.appendChild(particle);
+          
+          setTimeout(() => particle.remove(), 2000);
+        }
+      }
+
+      if (form) {
       console.log('[REGISTER] 🎯 Attaching form submit event listener...');
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -449,6 +652,11 @@
 
           console.log('[REGISTER] Registration successful. Response:', responseData);
           
+          // Animate success state
+          submitBtn.classList.add('success');
+          submitBtn.textContent = '✓ Account Created!';
+          createConfetti();
+          
           // Check if response includes email verification step
           if (responseData.next_step === 'otp_verification') {
             console.log('[REGISTER] Redirecting to OTP verification page...');
@@ -459,11 +667,11 @@
             const role = responseData.role_type || 'student';
             setTimeout(() => {
               window.location.href = `verify-email-otp.html?email=${email}&role=${role}`;
-            }, 1500);
+            }, 2500);
           } else {
             // Fallback to login
             showToast('Account created successfully! Redirecting to login...', 'success');
-            setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+            setTimeout(() => { window.location.href = 'index.html'; }, 2500);
           }
         } catch (err) {
           console.error('[REGISTER] Registration error caught:', err);
