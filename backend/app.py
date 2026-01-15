@@ -30,17 +30,22 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Initialize extensions
 db.init_app(app)
-CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "expose_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": False,
+        "max_age": 3600
+    }
+})
 jwt = JWTManager(app)
 
 # Initialize email service
 from email_service import init_mail
 init_mail(app)
 
-
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    return jsonify({'status': 'ok'}), 200
 
 
 def _maybe_init_database():
@@ -96,7 +101,7 @@ def _maybe_init_database():
                 ]
                 for branch in branches:
                     if not Department.query.filter_by(name=branch['name']).first():
-                        db.session.add(Department(name=branch['name'], full_name=branch['full_name']))
+                        db.session.add(Department(name=branch['name'], code=branch['name'][:3].upper(), description=branch['full_name']))
                 db.session.commit()
 
             if not has_batches or Batch.query.count() == 0:
