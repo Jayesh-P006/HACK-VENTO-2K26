@@ -272,9 +272,22 @@ def approve_student_verification(verification_id):
             user.updated_at = datetime.utcnow()
         
         db.session.commit()
+        
+        # Send welcome email after successful approval
+        try:
+            from email_service import send_welcome_email
+            send_welcome_email(
+                user_email=user.email,
+                full_name=verification.student.full_name,
+                role="Student"
+            )
+            print(f"✉️ Welcome email sent to {user.email}")
+        except Exception as email_error:
+            print(f"⚠️ Email send failed (but approval succeeded): {str(email_error)}")
+        
         return jsonify({
             'success': True,
-            'message': f"Student {verification.student.full_name} verified successfully"
+            'message': f"Student {verification.student.full_name} verified successfully. Welcome email sent!"
         }), 200
     except Exception as e:
         db.session.rollback()

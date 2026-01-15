@@ -32,6 +32,10 @@ db.init_app(app)
 CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
 jwt = JWTManager(app)
 
+# Initialize email service
+from email_service import init_mail
+init_mail(app)
+
 
 def _maybe_init_database():
     """Create tables (and demo users) if database is empty.
@@ -221,6 +225,7 @@ from resume_routes import resume_bp, get_resume_text
 from learning_guide_routes import learning_guide_bp
 from hiring_rounds_routes import hiring_rounds_bp
 from session_routes import session_bp
+from email_reminder_routes import email_reminder_bp
 
 app.register_blueprint(company_bp)
 app.register_blueprint(admin_bp)
@@ -228,6 +233,7 @@ app.register_blueprint(resume_bp)
 app.register_blueprint(learning_guide_bp)
 app.register_blueprint(hiring_rounds_bp)
 app.register_blueprint(session_bp)
+app.register_blueprint(email_reminder_bp)
 
 # ==================== Authentication Routes ====================
 
@@ -929,6 +935,62 @@ def update_applicant_status():
         application.notes = data.get('notes', application.notes)
         
         db.session.commit()
+        
+        # Send email notification based on status change
+        try:
+            from email_service import send_application_status_update, send_shortlist_notification, send_offer_letter
+            
+            student = application.student
+            job = application.job
+            
+            if student.user and student.user.email:
+                status = data['status']
+                
+                if status == 'Shortlisted':
+                    send_shortlist_notification(
+                        user_email=student.user.email,
+                        full_name=student.full_name,
+                        job_title=job.title,
+                        company_name=job.company.company_name
+                    )
+                elif status == 'Offered':
+                    # Check if offer letter exists for more details
+                    offer = OfferLetter.query.filter_by(
+                        student_id=student.id,
+                        job_id=job.id
+                    ).first()
+                    
+                    if offer:
+                        send_offer_letter(
+                            user_email=student.user.email,
+                            full_name=student.full_name,
+                            job_title=job.title,
+                            company_name=job.company.company_name,
+                            package=f"{offer.annual_ctc} LPA",
+                            joining_date=offer.joining_date.strftime('%B %d, %Y') if offer.joining_date else None
+                        )
+                    else:
+                        send_application_status_update(
+                            user_email=student.user.email,
+                            full_name=student.full_name,
+                            job_title=job.title,
+                            company_name=job.company.company_name,
+                            new_status=status
+                        )
+                else:
+                    # Send general status update for other statuses
+                    send_application_status_update(
+                        user_email=student.user.email,
+                        full_name=student.full_name,
+                        job_title=job.title,
+                        company_name=job.company.company_name,
+                        new_status=status,
+                        message=data.get('notes')
+                    )
+                
+                print(f"✉️ Status update email sent to {student.full_name}")
+        except Exception as email_error:
+            print(f"⚠️ Email notification failed (but status updated): {str(email_error)}")
         
         return jsonify({
             'message': 'Application status updated',
