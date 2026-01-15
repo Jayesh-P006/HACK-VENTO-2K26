@@ -303,12 +303,21 @@
           payload.phone = formData.get('phone');
           
           // Get graduation year from selected batch
-          const batchSelect = document.getElementById('batch_id');
-          const batchResponse = await fetch(`${API_BASE}/batches/active`);
-          if (batchResponse.ok) {
-            const batches = await batchResponse.json();
-            const selectedBatch = batches.find(b => b.id === payload.batch_id);
-            payload.graduation_year = selectedBatch ? selectedBatch.end_year : new Date().getFullYear() + 4;
+          try {
+            const batchSelect = document.getElementById('batch_id');
+            const batchResponse = await fetch(`${API_BASE}/batches/active`);
+            if (batchResponse.ok) {
+              const batches = await batchResponse.json();
+              const selectedBatch = batches.find(b => b.id === payload.batch_id);
+              payload.graduation_year = selectedBatch ? selectedBatch.end_year : new Date().getFullYear() + 4;
+            } else {
+              // Default graduation year if batch fetch fails
+              payload.graduation_year = new Date().getFullYear() + 4;
+            }
+          } catch (batchErr) {
+            console.error('Error fetching batches:', batchErr);
+            // Default graduation year if batch fetch fails
+            payload.graduation_year = new Date().getFullYear() + 4;
           }
         } else if (role === 2) {
           // Company validation
@@ -335,6 +344,7 @@
         submitBtn.disabled = true;
         submitBtn.textContent = 'Creating account...';
 
+        console.log('Sending registration payload:', payload);
         const response = await fetch(`${API_BASE}/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -342,6 +352,7 @@
         });
 
         const responseData = await response.json();
+        console.log('Registration response:', responseData, 'Status:', response.status);
 
         if (!response.ok) {
           throw new Error(responseData.error || `Error: ${response.status}`);
