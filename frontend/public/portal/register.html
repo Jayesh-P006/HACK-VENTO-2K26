@@ -428,13 +428,41 @@
         studentFields?.classList.add('hidden');
         companyFields?.classList.add('hidden');
         adminFields?.classList.add('hidden');
+
+        function setSectionState(section, isActive) {
+          if (!section) return;
+          const fields = section.querySelectorAll('input, select, textarea');
+          fields.forEach(field => {
+            if (isActive) {
+              field.removeAttribute('disabled');
+              if (field.dataset.wasRequired === 'true') {
+                field.setAttribute('required', '');
+              }
+            } else {
+              if (field.hasAttribute('required')) {
+                field.dataset.wasRequired = 'true';
+              }
+              field.removeAttribute('required');
+              field.setAttribute('disabled', '');
+            }
+          });
+        }
         
         if (role === 1) {
           studentFields?.classList.remove('hidden');
+          setSectionState(studentFields, true);
+          setSectionState(companyFields, false);
+          setSectionState(adminFields, false);
         } else if (role === 2) {
           companyFields?.classList.remove('hidden');
+          setSectionState(studentFields, false);
+          setSectionState(companyFields, true);
+          setSectionState(adminFields, false);
         } else if (role === 3) {
           adminFields?.classList.remove('hidden');
+          setSectionState(studentFields, false);
+          setSectionState(companyFields, false);
+          setSectionState(adminFields, true);
         }
       }
 
