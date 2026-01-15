@@ -216,6 +216,11 @@
     const adminFields = document.querySelector('[data-admin-fields]');
     const submitBtn = document.querySelector('#register-submit');
 
+    // Debug log
+    console.log('[REGISTER] Page loaded. API_BASE:', API_BASE);
+    console.log('[REGISTER] Form element:', form);
+    console.log('[REGISTER] Submit button:', submitBtn);
+
     function currentRole() {
       const checked = Array.from(roleRadios).find(r => r.checked);
       return checked ? parseInt(checked.value, 10) : 1;
@@ -242,131 +247,193 @@
     // Fetch active batches for the dropdown
     async function loadBatches() {
       try {
-        const response = await fetch(`${API_BASE}/batches/active`);
-        if (!response.ok) throw new Error('Failed to load batches');
+        console.log('[REGISTER] Loading batches from:', `${API_BASE}/batches/active`);
+        const response = await fetch(`${API_BASE}/batches/active`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        console.log('[REGISTER] Batch response status:', response.status);
+        
+        if (!response.ok) {
+          console.error('[REGISTER] Batch fetch failed:', response.status, response.statusText);
+          throw new Error('Failed to load batches');
+        }
+        
         const batches = await response.json();
+        console.log('[REGISTER] Batches loaded:', batches);
         
         const batchSelect = document.getElementById('batch_id');
         batchSelect.innerHTML = '<option value="" disabled selected>Select your batch</option>';
         
-        batches.forEach(batch => {
-          const option = document.createElement('option');
-          option.value = batch.id;
-          option.textContent = `${batch.batch_code} (${batch.degree} - ${batch.program || 'Engineering'})`;
-          batchSelect.appendChild(option);
-        });
+        if (Array.isArray(batches)) {
+          batches.forEach(batch => {
+            const option = document.createElement('option');
+            option.value = batch.id;
+            option.textContent = `${batch.batch_code} (${batch.degree} - ${batch.program || 'Engineering'})`;
+            batchSelect.appendChild(option);
+          });
+        }
       } catch (err) {
-        console.error('Error loading batches:', err);
-        showToast('Failed to load batches. Please refresh the page.', 'error');
+        console.error('[REGISTER] Error loading batches:', err);
+        showToast('Failed to load batches. You can still register.', 'warn');
       }
     }
     
     // Load batches on page load
     loadBatches();
 
-    form?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const formData = new FormData(form);
-      const role = currentRole();
-      
-      // Validate passwords match
-      if (formData.get('password') !== formData.get('confirm_password')) {
-        showToast('Passwords do not match', 'error');
-        return;
-      }
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        console.log('[REGISTER] Form submit event triggered');
+        
+        const formData = new FormData(form);
+        const role = currentRole();
+        
+        console.log('[REGISTER] Current role:', role);
+        
+        // Validate passwords match
+        const password = formData.get('password');
+        const confirmPassword = formData.get('confirm_password');
+        
+        if (!password || !confirmPassword) {
+          showToast('Password fields are required', 'error');
+          return;
+        }
+        
+        if (password !== confirmPassword) {
+          showToast('Passwords do not match', 'error');
+          return;
+        }
 
-      // Validate password length
-      if (formData.get('password').length < 6) {
-        showToast('Password must be at least 6 characters', 'error');
-        return;
-      }
+        // Validate password length
+        if (password.length < 6) {
+          showToast('Password must be at least 6 characters', 'error');
+          return;
+        }
 
-      const payload = {
-        email: formData.get('email'),
-        password: formData.get('password'),
-        role_id: role,
-      };
+        const payload = {
+          email: formData.get('email'),
+          password: password,
+          role_id: role,
+        };
 
-      try {
-        if (role === 1) {
-          // Student validation
-          if (!formData.get('full_name') || !formData.get('enrollment_number') || !formData.get('branch') || !formData.get('cgpa') || !formData.get('current_year') || !formData.get('batch_id') || !formData.get('phone')) {
-            showToast('Please fill all required student fields', 'error');
-            return;
-          }
-          payload.full_name = formData.get('full_name');
-          payload.enrollment_number = formData.get('enrollment_number');
-          payload.branch = formData.get('branch');
-          payload.cgpa = parseFloat(formData.get('cgpa'));
-          payload.current_year = parseInt(formData.get('current_year'), 10);
-          payload.batch_id = parseInt(formData.get('batch_id'), 10);
-          payload.phone = formData.get('phone');
-          
-          // Get graduation year from selected batch
-          try {
-            const batchSelect = document.getElementById('batch_id');
-            const batchResponse = await fetch(`${API_BASE}/batches/active`);
-            if (batchResponse.ok) {
-              const batches = await batchResponse.json();
-              const selectedBatch = batches.find(b => b.id === payload.batch_id);
-              payload.graduation_year = selectedBatch ? selectedBatch.end_year : new Date().getFullYear() + 4;
-            } else {
-              // Default graduation year if batch fetch fails
+        try {
+          if (role === 1) {
+            // Student validation
+            const requiredFields = ['full_name', 'enrollment_number', 'branch', 'cgpa', 'current_year', 'batch_id', 'phone'];
+            const missingFields = requiredFields.filter(f => !formData.get(f));
+            
+            if (missingFields.length > 0) {
+              showToast(`Please fill all required student fields: ${missingFields.join(', ')}`, 'error');
+              console.log('[REGISTER] Missing fields:', missingFields);
+              return;
+            }
+            
+            payload.full_name = formData.get('full_name');
+            payload.enrollment_number = formData.get('enrollment_number');
+            payload.branch = formData.get('branch');
+            payload.cgpa = parseFloat(formData.get('cgpa'));
+            payload.current_year = parseInt(formData.get('current_year'), 10);
+            payload.batch_id = parseInt(formData.get('batch_id'), 10);
+            payload.phone = formData.get('phone');
+            
+            // Get graduation year from selected batch
+            try {
+              const batchResponse = await fetch(`${API_BASE}/batches/active`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+              });
+              if (batchResponse.ok) {
+                const batches = await batchResponse.json();
+                const selectedBatch = Array.isArray(batches) ? batches.find(b => b.id === payload.batch_id) : null;
+                payload.graduation_year = selectedBatch ? selectedBatch.end_year : new Date().getFullYear() + 4;
+              } else {
+                payload.graduation_year = new Date().getFullYear() + 4;
+              }
+            } catch (batchErr) {
+              console.error('[REGISTER] Error calculating graduation year:', batchErr);
               payload.graduation_year = new Date().getFullYear() + 4;
             }
-          } catch (batchErr) {
-            console.error('Error fetching batches:', batchErr);
-            // Default graduation year if batch fetch fails
-            payload.graduation_year = new Date().getFullYear() + 4;
+          } else if (role === 2) {
+            // Company validation
+            const requiredFields = ['company_name', 'industry', 'hr_name', 'hr_phone'];
+            const missingFields = requiredFields.filter(f => !formData.get(f));
+            
+            if (missingFields.length > 0) {
+              showToast(`Please fill all required company fields: ${missingFields.join(', ')}`, 'error');
+              return;
+            }
+            
+            payload.company_name = formData.get('company_name');
+            payload.industry = formData.get('industry');
+            payload.hr_name = formData.get('hr_name');
+            payload.hr_phone = formData.get('hr_phone');
+          } else if (role === 3) {
+            // Admin validation
+            const requiredFields = ['admin_full_name', 'admin_phone', 'admin_department', 'admin_verification_key'];
+            const missingFields = requiredFields.filter(f => !formData.get(f));
+            
+            if (missingFields.length > 0) {
+              showToast(`Please fill all required admin fields: ${missingFields.join(', ')}`, 'error');
+              return;
+            }
+            
+            payload.full_name = formData.get('admin_full_name');
+            payload.phone = formData.get('admin_phone');
+            payload.department = formData.get('admin_department');
+            payload.verification_key = formData.get('admin_verification_key');
           }
-        } else if (role === 2) {
-          // Company validation
-          if (!formData.get('company_name') || !formData.get('industry') || !formData.get('hr_name') || !formData.get('hr_phone')) {
-            showToast('Please fill all required company fields', 'error');
-            return;
+
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Creating account...';
+
+          console.log('[REGISTER] Sending registration payload:', JSON.stringify(payload, null, 2));
+          console.log('[REGISTER] API endpoint:', `${API_BASE}/auth/register`);
+          
+          const response = await fetch(`${API_BASE}/auth/register`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload),
+          });
+
+          console.log('[REGISTER] Response status:', response.status);
+          console.log('[REGISTER] Response headers:', response.headers);
+          
+          let responseData;
+          try {
+            responseData = await response.json();
+            console.log('[REGISTER] Response data:', responseData);
+          } catch (parseErr) {
+            console.error('[REGISTER] Failed to parse response JSON:', parseErr);
+            responseData = { error: 'Server returned invalid response' };
           }
-          payload.company_name = formData.get('company_name');
-          payload.industry = formData.get('industry');
-          payload.hr_name = formData.get('hr_name');
-          payload.hr_phone = formData.get('hr_phone');
-        } else if (role === 3) {
-          // Admin validation
-          if (!formData.get('admin_full_name') || !formData.get('admin_phone') || !formData.get('admin_department') || !formData.get('admin_verification_key')) {
-            showToast('Please fill all required admin fields', 'error');
-            return;
+
+          if (!response.ok) {
+            const errorMsg = responseData.error || responseData.message || `Error: ${response.status} ${response.statusText}`;
+            console.error('[REGISTER] Registration failed:', errorMsg);
+            throw new Error(errorMsg);
           }
-          payload.full_name = formData.get('admin_full_name');
-          payload.phone = formData.get('admin_phone');
-          payload.department = formData.get('admin_department');
-          payload.verification_key = formData.get('admin_verification_key');
+
+          showToast('Account created successfully! Redirecting to login...', 'success');
+          setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+        } catch (err) {
+          console.error('[REGISTER] Registration error caught:', err);
+          console.error('[REGISTER] Error details:', {
+            message: err.message,
+            stack: err.stack
+          });
+          showToast(err.message || 'Registration failed. Please check your connection and try again.', 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Create Account';
         }
-
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Creating account...';
-
-        console.log('Sending registration payload:', payload);
-        const response = await fetch(`${API_BASE}/auth/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        const responseData = await response.json();
-        console.log('Registration response:', responseData, 'Status:', response.status);
-
-        if (!response.ok) {
-          throw new Error(responseData.error || `Error: ${response.status}`);
-        }
-
-        showToast('Account created successfully! Redirecting to login...', 'success');
-        setTimeout(() => { window.location.href = 'index.html'; }, 1500);
-      } catch (err) {
-        console.error('Registration error:', err);
-        showToast(err.message || 'Registration error', 'error');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Create Account';
-      }
-    });
+      });
+    } else {
+      console.error('[REGISTER] Form element not found!');
+    }
   </script>
 </body>
 </html>

@@ -6,7 +6,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
 from models import db, User, Student, Company, Job, Application, Announcement, StudentVerification
-from models import HiringRound, ApplicationRound, OfferLetter, Batch, Admin, AdminVerification, AdminAccessLog
+from models import HiringRound, ApplicationRound, OfferLetter, Batch, Admin, AdminVerification, AdminAccessLog, Department
 from sqlalchemy import func, or_, and_
 import openpyxl
 from io import BytesIO
@@ -47,10 +47,42 @@ def _maybe_init_database():
         with app.app_context():
             inspector = inspect(db.engine)
             has_users_table = inspector.has_table('users')
+            has_departments = inspector.has_table('departments')
+            has_batches = inspector.has_table('batches')
 
             if not has_users_table:
                 print('[db] users table missing; creating all tables...')
                 db.create_all()
+
+            # Seed master data (departments, batches, skills)
+            if not has_departments or Department.query.count() == 0:
+                print('[db] seeding departments...')
+                branches = [
+                    {'name': 'CSE', 'full_name': 'Computer Science and Engineering'},
+                    {'name': 'IT', 'full_name': 'Information Technology'},
+                    {'name': 'ECE', 'full_name': 'Electronics and Communication Engineering'},
+                    {'name': 'EEE', 'full_name': 'Electrical and Electronics Engineering'},
+                    {'name': 'ME', 'full_name': 'Mechanical Engineering'},
+                    {'name': 'CE', 'full_name': 'Civil Engineering'},
+                    {'name': 'Chemical', 'full_name': 'Chemical Engineering'},
+                ]
+                for branch in branches:
+                    if not Department.query.filter_by(name=branch['name']).first():
+                        db.session.add(Department(name=branch['name'], full_name=branch['full_name']))
+                db.session.commit()
+
+            if not has_batches or Batch.query.count() == 0:
+                print('[db] seeding batches...')
+                batches_data = [
+                    {'batch_code': '2023-27', 'start_year': 2023, 'end_year': 2027, 'degree': 'B.Tech', 'program': 'All', 'status': 'Active'},
+                    {'batch_code': '2022-26', 'start_year': 2022, 'end_year': 2026, 'degree': 'B.Tech', 'program': 'All', 'status': 'Active'},
+                    {'batch_code': '2021-25', 'start_year': 2021, 'end_year': 2025, 'degree': 'B.Tech', 'program': 'All', 'status': 'Active'},
+                    {'batch_code': '2020-24', 'start_year': 2020, 'end_year': 2024, 'degree': 'B.Tech', 'program': 'All', 'status': 'Graduated'},
+                ]
+                for batch_data in batches_data:
+                    if not Batch.query.filter_by(batch_code=batch_data['batch_code']).first():
+                        db.session.add(Batch(**batch_data))
+                db.session.commit()
 
             seed = os.getenv('SEED_DEMO_USERS', '1').strip().lower() in ('1', 'true', 'yes', 'y', 'on')
             if not seed:
@@ -72,7 +104,6 @@ def _maybe_init_database():
                 if existing:
                     continue
                 user = User(email=email, role_id=role_id, is_verified=True)
-                user.set_password(password)
                 db.session.add(user)
                 db.session.flush()  # Get user.id
                 
@@ -254,14 +285,37 @@ def get_active_batches():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/departments', methods=['GET'])
+def get_departments():
+    """Get all departments/branches (Public endpoint)"""
+    try:
+        departments = Department.query.all()
+        return jsonify([{
+            'id': dept.id,
+            'name': dept.name,
+            'full_name': dept.full_name
+        } for dept in departments]), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/auth/register', methods=['POST'])
 def register():
     """Register a new user (Student, Company, or Admin)"""
     try:
+        print(f'\n[REGISTER] ========== NEW REGISTRATION REQUEST ==========')
+        print(f'[REGISTER] Request method: {request.method}')
+        print(f'[REGISTER] Content-Type: {request.content_type}')
+        
         data = request.get_json()
+        print(f'[REGISTER] Received data keys: {list(data.keys()) if data else "None"}')
+        print(f'[REGISTER] Email: {data.get("email", "N/A")}')
+        print(f'[REGISTER] Role ID: {data.get("role_id", "N/A")}')
         
         # Check if user exists
-        if User.query.filter_by(email=data['email']).first():
+        existing_user = User.query.filter_by(email=data['email']).first()
+        if existing_user:
+            print(f'[REGISTER] ERROR: Email {data["email"]} already registered')
             return jsonify({'error': 'Email already registered'}), 400
         
         # Create user
@@ -273,9 +327,11 @@ def register():
         user.set_password(data['password'])
         db.session.add(user)
         db.session.flush()
+        print(f'[REGISTER] User created with ID: {user.id}, Role: {user.role_id}')
         
         # Create role-specific profile
         if data['role_id'] == 1:  # Student
+            print(f'[REGISTER] Creating Student profile...')
             student = Student(
                 user_id=user.id,
                 full_name=data['full_name'],
@@ -289,6 +345,7 @@ def register():
             )
             db.session.add(student)
             db.session.flush()  # Get student ID
+            print(f'[REGISTER] Student created with ID: {student.id}')
             
             # Create verification request for admin approval
             verification = StudentVerification(
@@ -296,8 +353,10 @@ def register():
                 status='Pending'
             )
             db.session.add(verification)
+            print(f'[REGISTER] StudentVerification created: {student.id}')
         
         elif data['role_id'] == 2:  # Company
+            print(f'[REGISTER] Creating Company profile...')
             company = Company(
                 user_id=user.id,
                 company_name=data['company_name'],
@@ -306,11 +365,14 @@ def register():
                 hr_phone=data.get('hr_phone', '')
             )
             db.session.add(company)
+            print(f'[REGISTER] Company created')
         
         elif data['role_id'] == 3:  # Admin
+            print(f'[REGISTER] Creating Admin profile...')
             # Verify admin creation key (optional - can be set via environment variable)
             admin_key = os.getenv('ADMIN_CREATION_KEY', '')
             if admin_key and data.get('verification_key') != admin_key:
+                print(f'[REGISTER] ERROR: Invalid admin verification key')
                 return jsonify({'error': 'Invalid admin verification key'}), 403
             
             admin = Admin(
@@ -322,6 +384,7 @@ def register():
             )
             db.session.add(admin)
             db.session.flush()
+            print(f'[REGISTER] Admin created with ID: {admin.id}')
             
             # Create admin verification request
             admin_verification = AdminVerification(
@@ -329,6 +392,7 @@ def register():
                 status='Pending'
             )
             db.session.add(admin_verification)
+            print(f'[REGISTER] AdminVerification created for admin {admin.id}')
             
             # Create initial access log
             access_log = AdminAccessLog(
@@ -338,8 +402,10 @@ def register():
                 details=f'Admin account created for {data.get("department", "Coordinator")} department'
             )
             db.session.add(access_log)
+            print(f'[REGISTER] AdminAccessLog created')
         
         db.session.commit()
+        print(f'[REGISTER] SUCCESS: User {data["email"]} registered successfully')
         
         return jsonify({
             'message': 'Registration successful. Please wait for admin verification.',
@@ -347,7 +413,17 @@ def register():
         }), 201
         
     except Exception as e:
-        db.session.rollback()
+        print(f'\n[REGISTER] EXCEPTION OCCURRED')
+        print(f'[REGISTER] Exception type: {type(e).__name__}')
+        print(f'[REGISTER] Exception message: {str(e)}')
+        import traceback
+        print(f'[REGISTER] Traceback:\n{traceback.format_exc()}')
+        
+        try:
+            db.session.rollback()
+        except:
+            pass
+        
         return jsonify({'error': str(e)}), 500
 
 

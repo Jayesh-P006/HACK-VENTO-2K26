@@ -1169,7 +1169,32 @@
                     }).join('');
                 }
             } catch(e) {}
-            try { const batches = await apiCall('/admin/batch-years'); const batchList = document.getElementById('batchesList'); if (batches.data) { batchList.innerHTML = batches.data.map(b => `<div class="item-chip"><span>${b.year}</span><span class="minor">${b.academic_session || ''}</span></div>`).join(''); } } catch(e) {}
+            
+            // Load batches from /admin/batches endpoint
+            try { 
+                const batches = await apiCall('/admin/batches'); 
+                const batchList = document.getElementById('batchesList'); 
+                if (batchList && Array.isArray(batches)) { 
+                    batchList.innerHTML = batches.map(b => `
+                        <div class="item-chip">
+                            <span>${b.batch_code}</span>
+                            <span class="minor">${b.start_year}-${b.end_year}</span>
+                            <span class="count-pill">${b.student_count || 0} students</span>
+                        </div>
+                    `).join(''); 
+                } 
+            } catch(e) {
+                console.log('Could not load batches from /admin/batches');
+                // Fall back to batch-years endpoint
+                try { 
+                    const batches = await apiCall('/admin/batch-years'); 
+                    const batchList = document.getElementById('batchesList'); 
+                    if (batches.data) { 
+                        batchList.innerHTML = batches.data.map(b => `<div class="item-chip"><span>${b.year}</span><span class="minor">${b.academic_session || ''}</span></div>`).join(''); 
+                    } 
+                } catch(e2) {}
+            }
+            
             try { const skills = await apiCall('/admin/skills'); const skillList = document.getElementById('skillsList'); if (skills.data) { skillList.innerHTML = skills.data.map(s => `<div class="item-chip"><span>${s.name}</span><span class="minor">${s.category || ''}</span></div>`).join(''); } } catch(e) {}
         }
 
