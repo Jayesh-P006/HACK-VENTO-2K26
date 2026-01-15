@@ -56,8 +56,8 @@ def _maybe_init_database():
             has_departments = inspector.has_table('departments')
             has_batches = inspector.has_table('batches')
 
-            if not has_users_table:
-                print('[db] users table missing; creating all tables...')
+            if not has_users_table or not has_departments or not has_batches:
+                print('[db] core tables missing; creating all tables...')
                 db.create_all()
 
             def ensure_otp_columns(table_name):
