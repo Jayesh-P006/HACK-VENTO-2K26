@@ -6,7 +6,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
 from models import db, User, Student, Company, Job, Application, Announcement, StudentVerification
-from models import HiringRound, ApplicationRound, OfferLetter
+from models import HiringRound, ApplicationRound, OfferLetter, Batch
 from sqlalchemy import func, or_, and_
 import openpyxl
 from io import BytesIO
@@ -236,6 +236,23 @@ app.register_blueprint(session_bp)
 app.register_blueprint(email_reminder_bp)
 
 # ==================== Authentication Routes ====================
+
+@app.route('/api/batches/active', methods=['GET'])
+def get_active_batches():
+    """Get all active batches for registration (Public endpoint)"""
+    try:
+        batches = Batch.query.filter_by(status='Active').order_by(Batch.end_year.desc()).all()
+        return jsonify([{
+            'id': batch.id,
+            'batch_code': batch.batch_code,
+            'start_year': batch.start_year,
+            'end_year': batch.end_year,
+            'degree': batch.degree,
+            'program': batch.program
+        } for batch in batches]), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/auth/register', methods=['POST'])
 def register():
