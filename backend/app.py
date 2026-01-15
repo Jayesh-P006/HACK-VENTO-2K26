@@ -722,8 +722,9 @@ def login():
         if not user or not user.check_password(data['password']):
             return jsonify({'error': 'Invalid email or password'}), 401
         
-        # Require OTP verification for student/admin accounts
-        if user.role_id in (1, 3):
+        # Require OTP verification for student/admin accounts (skip for demo accounts)
+        demo_emails = ['admin@university.edu', 'student@university.edu', 'company@tech.com']
+        if user.role_id in (1, 3) and user.email not in demo_emails:
             verification_record = None
             if user.role_id == 1 and user.student:
                 verification_record = StudentVerification.query.filter_by(student_id=user.student.id).first()

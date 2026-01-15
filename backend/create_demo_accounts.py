@@ -28,6 +28,20 @@ cursor.execute("""
     VALUES (%s, %s, 3, TRUE)
 """, ('admin@university.edu', admin_hash))
 admin_user_id = cursor.lastrowid
+
+# Create Admin profile
+cursor.execute("""
+    INSERT INTO admins (user_id, full_name, email, phone, department)
+    VALUES (%s, 'Admin User', 'admin@university.edu', '9876543200', 'Placement Cell')
+""", (admin_user_id,))
+admin_id = cursor.lastrowid
+
+# Create admin verification record with OTP verified
+cursor.execute("""
+    INSERT INTO admin_verification (admin_id, otp_verified)
+    VALUES (%s, TRUE)
+""", (admin_id,))
+
 print(f"✓ Admin account created: admin@university.edu / admin123")
 
 # Insert Student User
@@ -41,6 +55,14 @@ cursor.execute("""
     INSERT INTO students (user_id, full_name, enrollment_number, branch, cgpa, graduation_year, phone, profile_completed) 
     VALUES (%s, 'John Doe', 'EN2024001', 'Computer Science', 8.5, 2026, '9876543210', TRUE)
 """, (student_user_id,))
+student_id = cursor.lastrowid
+
+# Create student verification record with OTP verified
+cursor.execute("""
+    INSERT INTO student_verification (student_id, otp_verified)
+    VALUES (%s, TRUE)
+""", (student_id,))
+
 print(f"✓ Student account created: student@university.edu / student123")
 
 # Insert Company User
