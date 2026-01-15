@@ -7,12 +7,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Database name
+DB_NAME = os.getenv('DB_NAME', 'placement_portal')
+
 # Database connection
 conn = pymysql.connect(
     host=os.getenv('DB_HOST', 'localhost'),
     user=os.getenv('DB_USER', 'root'),
     password=os.getenv('DB_PASSWORD', ''),
-    database=os.getenv('DB_NAME', 'placement_portal'),
+    database=DB_NAME,
     charset='utf8mb4'
 )
 
@@ -105,6 +108,11 @@ tables_to_create = [
             id INT PRIMARY KEY AUTO_INCREMENT,
             student_id INT NOT NULL UNIQUE,
             status ENUM('Pending', 'Verified', 'Rejected') DEFAULT 'Pending',
+            otp VARCHAR(6),
+            otp_verified BOOLEAN DEFAULT FALSE,
+            otp_sent_at DATETIME,
+            otp_verified_at DATETIME,
+            otp_attempts INT DEFAULT 0,
             marksheet_10th_url VARCHAR(500),
             marksheet_12th_url VARCHAR(500),
             degree_certificate_url VARCHAR(500),
@@ -122,11 +130,33 @@ tables_to_create = [
     )
 ]
 
+def add_column_if_missing(table_name, column_name, column_definition):
+    cursor.execute(
+        """
+        SELECT COUNT(*)
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s
+        """,
+        (DB_NAME, table_name, column_name)
+    )
+    exists = cursor.fetchone()[0]
+    if not exists:
+        print(f"Adding missing column {table_name}.{column_name}...")
+        cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_definition}")
+        print(f"  ✓ Added {column_name}")
+
 try:
     for table_name, create_sql in tables_to_create:
         print(f"Creating {table_name} table...")
         cursor.execute(create_sql)
         print(f"  ✓ {table_name} created/verified")
+
+        if table_name == "student_verification":
+            add_column_if_missing("student_verification", "otp", "otp VARCHAR(6)")
+            add_column_if_missing("student_verification", "otp_verified", "otp_verified BOOLEAN DEFAULT FALSE")
+            add_column_if_missing("student_verification", "otp_sent_at", "otp_sent_at DATETIME")
+            add_column_if_missing("student_verification", "otp_verified_at", "otp_verified_at DATETIME")
+            add_column_if_missing("student_verification", "otp_attempts", "otp_attempts INT DEFAULT 0")
     
     conn.commit()
     print("\n✓ All tables created successfully!")

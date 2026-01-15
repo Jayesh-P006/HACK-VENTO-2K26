@@ -67,6 +67,7 @@ def main():
         sql_files = [
             'schema.sql',
             'schema_enhancements.sql',
+            'otp_columns.sql',
             'batch_session_schema.sql',
             'hiring_rounds_schema.sql'
         ]
