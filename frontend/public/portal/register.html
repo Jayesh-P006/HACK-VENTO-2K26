@@ -39,7 +39,7 @@
               <p class="minor">Choose a role and fill the required fields</p>
             </div>
           <form id="register-form" class="grid" style="gap: 18px;">
-            <div style="display: flex; gap: 12px; justify-content: center; padding: 12px; background: rgba(124, 58, 237, 0.1); border-radius: var(--radius-sm); border: 1px solid rgba(124, 58, 237, 0.2);">
+            <div style="display: flex; gap: 12px; justify-content: center; padding: 12px; background: rgba(124, 58, 237, 0.1); border-radius: var(--radius-sm); border: 1px solid rgba(124, 58, 237, 0.2); flex-wrap: wrap;">
               <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 600;">
                 <input type="radio" name="role" value="1" checked style="width: auto;">
                 <span>🎓 Student</span>
@@ -47,6 +47,10 @@
               <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 600;">
                 <input type="radio" name="role" value="2" style="width: auto;">
                 <span>🏢 Company</span>
+              </label>
+              <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                <input type="radio" name="role" value="3" style="width: auto;">
+                <span>🔐 Admin</span>
               </label>
             </div>
 
@@ -109,7 +113,7 @@
                 </select>
                 <p class="minor" style="margin-top: 4px;">Select your batch to register for placements.</p>
               </div>
-              <div>
+              <div colspan="2" style="grid-column: 1 / -1;">
                 <label for="phone">Phone</label>
                 <input id="phone" name="phone" type="tel" required placeholder="9876543210">
               </div>
@@ -131,6 +135,33 @@
               <div>
                 <label for="hr_phone">HR Phone *</label>
                 <input id="hr_phone" name="hr_phone" required placeholder="9876543210">
+              </div>
+            </div>
+
+            <div data-admin-fields class="grid grid-2 hidden">
+              <div>
+                <label for="admin_full_name">Full Name *</label>
+                <input id="admin_full_name" name="admin_full_name" required placeholder="Admin name">
+              </div>
+              <div>
+                <label for="admin_phone">Phone *</label>
+                <input id="admin_phone" name="admin_phone" type="tel" required placeholder="9876543210">
+              </div>
+              <div>
+                <label for="admin_department">Department *</label>
+                <select id="admin_department" name="admin_department" required>
+                  <option value="" disabled selected>Select department</option>
+                  <option value="Placement Cell">Placement Cell</option>
+                  <option value="HR">HR</option>
+                  <option value="Training">Training</option>
+                  <option value="Coordinator">Coordinator</option>
+                  <option value="Super Admin">Super Admin</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label for="admin_verification_key">Verification Key *</label>
+                <input id="admin_verification_key" name="admin_verification_key" type="password" required placeholder="Admin verification key from director">
               </div>
             </div>
 
@@ -182,6 +213,7 @@
     const roleRadios = document.querySelectorAll('input[name="role"]');
     const studentFields = document.querySelector('[data-student-fields]');
     const companyFields = document.querySelector('[data-company-fields]');
+    const adminFields = document.querySelector('[data-admin-fields]');
     const submitBtn = document.querySelector('#register-submit');
 
     function currentRole() {
@@ -191,12 +223,16 @@
 
     function toggleFields() {
       const role = currentRole();
+      studentFields?.classList.add('hidden');
+      companyFields?.classList.add('hidden');
+      adminFields?.classList.add('hidden');
+      
       if (role === 1) {
         studentFields?.classList.remove('hidden');
-        companyFields?.classList.add('hidden');
-      } else {
-        studentFields?.classList.add('hidden');
+      } else if (role === 2) {
         companyFields?.classList.remove('hidden');
+      } else if (role === 3) {
+        adminFields?.classList.remove('hidden');
       }
     }
 
@@ -251,61 +287,71 @@
         role_id: role,
       };
 
-      if (role === 1) {
-        // Student validation
-        if (!formData.get('full_name') || !formData.get('enrollment_number') || !formData.get('branch') || !formData.get('cgpa') || !formData.get('current_year') || !formData.get('batch_id') || !formData.get('phone')) {
-          showToast('Please fill all required student fields', 'error');
-          return;
-        }
-        payload.full_name = formData.get('full_name');
-        payload.enrollment_number = formData.get('enrollment_number');
-        payload.branch = formData.get('branch');
-        payload.cgpa = parseFloat(formData.get('cgpa'));
-        payload.current_year = parseInt(formData.get('current_year'), 10);
-        payload.batch_id = parseInt(formData.get('batch_id'), 10);
-        payload.phone = formData.get('phone');
-        
-        // Get graduation year from selected batch
-        const batchSelect = document.getElementById('batch_id');
-        const selectedOption = batchSelect.options[batchSelect.selectedIndex];
-        if (selectedOption) {
-          // Extract end year from batch or use a default
-          const batches = await fetch(`${API_BASE}/batches/active`).then(r => r.json());
-          const selectedBatch = batches.find(b => b.id === payload.batch_id);
-          payload.graduation_year = selectedBatch ? selectedBatch.end_year : new Date().getFullYear() + 4;
-        }
-      } else {
-        // Company validation
-        if (!formData.get('company_name') || !formData.get('industry') || !formData.get('hr_name') || !formData.get('hr_phone')) {
-          showToast('Please fill all required company fields', 'error');
-          return;
-        }
-        payload.company_name = formData.get('company_name');
-        payload.industry = formData.get('industry');
-        payload.hr_name = formData.get('hr_name');
-        payload.hr_phone = formData.get('hr_phone');
-      }
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Creating account...';
       try {
+        if (role === 1) {
+          // Student validation
+          if (!formData.get('full_name') || !formData.get('enrollment_number') || !formData.get('branch') || !formData.get('cgpa') || !formData.get('current_year') || !formData.get('batch_id') || !formData.get('phone')) {
+            showToast('Please fill all required student fields', 'error');
+            return;
+          }
+          payload.full_name = formData.get('full_name');
+          payload.enrollment_number = formData.get('enrollment_number');
+          payload.branch = formData.get('branch');
+          payload.cgpa = parseFloat(formData.get('cgpa'));
+          payload.current_year = parseInt(formData.get('current_year'), 10);
+          payload.batch_id = parseInt(formData.get('batch_id'), 10);
+          payload.phone = formData.get('phone');
+          
+          // Get graduation year from selected batch
+          const batchSelect = document.getElementById('batch_id');
+          const batchResponse = await fetch(`${API_BASE}/batches/active`);
+          if (batchResponse.ok) {
+            const batches = await batchResponse.json();
+            const selectedBatch = batches.find(b => b.id === payload.batch_id);
+            payload.graduation_year = selectedBatch ? selectedBatch.end_year : new Date().getFullYear() + 4;
+          }
+        } else if (role === 2) {
+          // Company validation
+          if (!formData.get('company_name') || !formData.get('industry') || !formData.get('hr_name') || !formData.get('hr_phone')) {
+            showToast('Please fill all required company fields', 'error');
+            return;
+          }
+          payload.company_name = formData.get('company_name');
+          payload.industry = formData.get('industry');
+          payload.hr_name = formData.get('hr_name');
+          payload.hr_phone = formData.get('hr_phone');
+        } else if (role === 3) {
+          // Admin validation
+          if (!formData.get('admin_full_name') || !formData.get('admin_phone') || !formData.get('admin_department') || !formData.get('admin_verification_key')) {
+            showToast('Please fill all required admin fields', 'error');
+            return;
+          }
+          payload.full_name = formData.get('admin_full_name');
+          payload.phone = formData.get('admin_phone');
+          payload.department = formData.get('admin_department');
+          payload.verification_key = formData.get('admin_verification_key');
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating account...';
+
         const response = await fetch(`${API_BASE}/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-        }).catch(networkError => {
-          throw new Error('Cannot connect to server. Please ensure the backend is running.');
         });
+
+        const responseData = await response.json();
+
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Registration failed');
+          throw new Error(responseData.error || `Error: ${response.status}`);
         }
+
         showToast('Account created successfully! Redirecting to login...', 'success');
         setTimeout(() => { window.location.href = 'index.html'; }, 1500);
       } catch (err) {
         console.error('Registration error:', err);
         showToast(err.message || 'Registration error', 'error');
-      } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Create Account';
       }

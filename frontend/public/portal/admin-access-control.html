@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Access Control · Placement Portal</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/silent-syntax-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/brand/silent-syntax-icon.svg" />
+    <link rel="shortcut icon" href="/brand/silent-syntax-icon.png" />
+    <link rel="stylesheet" href="assets/css/styles.css">
+    <style>
+        .admin-shell { max-width: 1400px; margin: 0 auto; }
+        
+        .admin-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: var(--glass);
+            border: var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 24px;
+        }
+        
+        .admin-header .brand { display: flex; align-items: center; gap: 12px; }
+        .admin-header .brand h1 {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #7c3aed, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .tabs { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
+        
+        .tab-btn {
+            padding: 12px 20px;
+            border-radius: var(--radius-sm);
+            background: var(--glass);
+            border: var(--border);
+            color: var(--muted);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+        
+        .tab-btn:hover { background: var(--element); color: var(--text); }
+        .tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .section-title h3 { margin: 0; font-size: 16px; }
+        
+        .badge {
+            padding: 4px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .badge-blue { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+        .badge-green { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .badge-red { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+        .badge-amber { background: rgba(217, 119, 6, 0.2); color: #d97706; }
+        
+        .admin-card {
+            padding: 16px;
+            background: var(--glass);
+            border: var(--border);
+            border-radius: var(--radius-sm);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .admin-info { flex: 1; }
+        .admin-info h4 { margin: 0 0 4px 0; font-size: 14px; font-weight: 600; }
+        .admin-info p { margin: 0 0 6px 0; font-size: 12px; color: var(--muted); }
+        
+        .admin-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-small {
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+        
+        .btn-approve {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            border: 1px solid #22c55e;
+        }
+        
+        .btn-approve:hover { background: #22c55e; color: white; }
+        
+        .btn-reject {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid #ef4444;
+        }
+        
+        .btn-reject:hover { background: #ef4444; color: white; }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active { display: flex; }
+        
+        .modal-content {
+            background: var(--bg);
+            border: var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--muted);
+        }
+        
+        .modal-close:hover { color: var(--text); }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        
+        @media (max-width: 768px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .admin-card { flex-direction: column; align-items: flex-start; }
+            .admin-actions { width: 100%; margin-top: 12px; }
+        }
+        
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        
+        .log-table th {
+            text-align: left;
+            padding: 12px;
+            background: var(--element);
+            font-weight: 600;
+            border-bottom: var(--border);
+            border: 1px solid var(--border);
+        }
+        
+        .log-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .log-table tr:hover { background: var(--element); }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-pending { background: rgba(217, 119, 6, 0.2); color: #d97706; }
+        .status-approved { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+        .status-rejected { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    </style>
+</head>
+<body>
+    <main>
+        <div class="page-shell">
+            <div class="admin-shell">
+                <div class="admin-header">
+                    <div class="brand">
+                        <img src="/brand/silent-syntax-icon.png" alt="Portal" style="width: 32px; height: 32px;">
+                        <h1>Admin Access Control</h1>
+                    </div>
+                    <div style="display: flex; gap: 12px;">
+                        <a href="admin-dashboard.html" class="btn btn-ghost" style="font-size: 12px;">← Back to Dashboard</a>
+                        <button data-logout class="btn btn-ghost" style="font-size: 12px;">Logout</button>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="pending">Pending Approvals</button>
+                    <button class="tab-btn" data-tab="access-log">Access Log</button>
+                    <button class="tab-btn" data-tab="all-admins">All Admins</button>
+                </div>
+
+                <!-- Pending Approvals Tab -->
+                <div id="pending-tab" class="tab-content">
+                    <div class="section-title">
+                        <h3>Pending Admin Verification</h3>
+                        <span class="badge badge-amber" id="pending-count">0</span>
+                    </div>
+                    <div id="pending-admins-list" class="grid" style="gap: 12px;"></div>
+                    <div id="no-pending" class="card" style="text-align: center; padding: 32px; display: none;">
+                        <p class="minor">✓ No pending admin verifications</p>
+                    </div>
+                </div>
+
+                <!-- Access Log Tab -->
+                <div id="access-log-tab" class="tab-content hidden">
+                    <div class="section-title">
+                        <h3>Admin Access History</h3>
+                        <span class="badge badge-blue" id="log-count">0</span>
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table class="log-table" id="access-log-table">
+                            <thead>
+                                <tr>
+                                    <th>Admin Name</th>
+                                    <th>Email</th>
+                                    <th>Department</th>
+                                    <th>Action</th>
+                                    <th>Status</th>
+                                    <th>Performed By</th>
+                                    <th>Date/Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="access-log-body"></tbody>
+                        </table>
+                    </div>
+                    <div id="no-logs" class="card" style="text-align: center; padding: 32px; display: none;">
+                        <p class="minor">No access logs available</p>
+                    </div>
+                </div>
+
+                <!-- All Admins Tab -->
+                <div id="all-admins-tab" class="tab-content hidden">
+                    <div class="section-title">
+                        <h3>All System Admins</h3>
+                        <span class="badge badge-blue" id="total-admins">0</span>
+                    </div>
+                    <div id="all-admins-list" class="grid" style="gap: 12px;"></div>
+                    <div id="no-admins" class="card" style="text-align: center; padding: 32px; display: none;">
+                        <p class="minor">No admins created yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Rejection Reason Modal -->
+    <div id="rejection-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>Reject Admin</span>
+                <button class="modal-close" data-close-modal>&times;</button>
+            </div>
+            <form id="rejection-form" class="grid" style="gap: 12px;">
+                <input type="hidden" id="rejection-admin-id">
+                <div>
+                    <label for="rejection-reason">Reason for Rejection</label>
+                    <textarea id="rejection-reason" placeholder="Please provide a reason..." required style="min-height: 100px; padding: 12px; border: var(--border); border-radius: var(--radius-sm); background: var(--element); color: var(--text); font-family: inherit;"></textarea>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Submit Rejection</button>
+                    <button type="button" class="btn btn-ghost" data-close-modal style="flex: 1;">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? 'http://localhost:5000/api'
+            : 'https://hack-vento-2k26-production.up.railway.app/api';
+
+        function getAuth() {
+            try {
+                const token = localStorage.getItem('token');
+                const user = JSON.parse(localStorage.getItem('user') || 'null');
+                if (!token || !user) return null;
+                return { token, user };
+            } catch (_) { return null; }
+        }
+
+        function showToast(msg, type = 'info') {
+            let stack = document.getElementById('toast-stack');
+            if (!stack) {
+                stack = document.createElement('div');
+                stack.id = 'toast-stack';
+                stack.className = 'toast-stack';
+                document.body.appendChild(stack);
+            }
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = msg;
+            stack.appendChild(toast);
+            setTimeout(() => toast.remove(), 4200);
+        }
+
+        function formatDate(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString();
+        }
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.getAttribute('data-tab');
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                btn.classList.add('active');
+                document.getElementById(tab + '-tab').classList.remove('hidden');
+            });
+        });
+
+        // Modal handling
+        document.querySelector('[data-close-modal]').addEventListener('click', () => {
+            document.getElementById('rejection-modal').classList.remove('active');
+        });
+
+        document.getElementById('rejection-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('rejection-modal')) {
+                document.getElementById('rejection-modal').classList.remove('active');
+            }
+        });
+
+        // Logout
+        document.querySelector('[data-logout]').addEventListener('click', () => {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        });
+
+        // Load pending admins
+        async function loadPendingAdmins() {
+            try {
+                const auth = getAuth();
+                if (!auth) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                const response = await fetch(`${API_BASE}/admin/pending-admins`, {
+                    headers: { 'Authorization': `Bearer ${auth.token}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load pending admins');
+                const data = await response.json();
+
+                const list = document.getElementById('pending-admins-list');
+                list.innerHTML = '';
+
+                if (data.data.length === 0) {
+                    document.getElementById('no-pending').style.display = 'block';
+                    document.getElementById('pending-count').textContent = '0';
+                } else {
+                    document.getElementById('no-pending').style.display = 'none';
+                    document.getElementById('pending-count').textContent = data.data.length;
+
+                    data.data.forEach(admin => {
+                        const card = document.createElement('div');
+                        card.className = 'admin-card';
+                        card.innerHTML = `
+                            <div class="admin-info">
+                                <h4>${admin.admin_name || 'Unknown'}</h4>
+                                <p><strong>Email:</strong> ${admin.email}</p>
+                                <p><strong>Department:</strong> ${admin.department || 'N/A'}</p>
+                                <p><strong>Submitted:</strong> ${formatDate(admin.submitted_at)}</p>
+                            </div>
+                            <div class="admin-actions">
+                                <button class="btn-small btn-approve" onclick="approveAdmin(${admin.id})">Approve</button>
+                                <button class="btn-small btn-reject" onclick="showRejectModal(${admin.id})">Reject</button>
+                            </div>
+                        `;
+                        list.appendChild(card);
+                    });
+                }
+            } catch (err) {
+                console.error('Error loading pending admins:', err);
+                showToast('Failed to load pending admins', 'error');
+            }
+        }
+
+        // Load access log
+        async function loadAccessLog() {
+            try {
+                const auth = getAuth();
+                if (!auth) return;
+
+                const response = await fetch(`${API_BASE}/admin/admin-access-log`, {
+                    headers: { 'Authorization': `Bearer ${auth.token}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load access log');
+                const data = await response.json();
+
+                document.getElementById('log-count').textContent = data.total_logs;
+                const tbody = document.getElementById('access-log-body');
+                tbody.innerHTML = '';
+
+                if (data.logs.length === 0) {
+                    document.getElementById('no-logs').style.display = 'block';
+                } else {
+                    document.getElementById('no-logs').style.display = 'none';
+
+                    data.logs.forEach(log => {
+                        const row = document.createElement('tr');
+                        const statusClass = `status-${log.status.toLowerCase()}`;
+                        row.innerHTML = `
+                            <td>${log.admin_name}</td>
+                            <td>${log.admin_email}</td>
+                            <td>${log.department}</td>
+                            <td>${log.action}</td>
+                            <td><span class="status-badge ${statusClass}">${log.status}</span></td>
+                            <td>${log.performed_by}</td>
+                            <td>${formatDate(log.timestamp)}</td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                }
+            } catch (err) {
+                console.error('Error loading access log:', err);
+                showToast('Failed to load access log', 'error');
+            }
+        }
+
+        // Load all admins
+        async function loadAllAdmins() {
+            try {
+                const auth = getAuth();
+                if (!auth) return;
+
+                const response = await fetch(`${API_BASE}/admin/admins`, {
+                    headers: { 'Authorization': `Bearer ${auth.token}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load admins');
+                const data = await response.json();
+
+                const list = document.getElementById('all-admins-list');
+                list.innerHTML = '';
+
+                document.getElementById('total-admins').textContent = data.count;
+
+                if (data.count === 0) {
+                    document.getElementById('no-admins').style.display = 'block';
+                } else {
+                    document.getElementById('no-admins').style.display = 'none';
+
+                    data.admins.forEach(admin => {
+                        const statusBadge = admin.verified
+                            ? '<span class="badge badge-green">Verified</span>'
+                            : `<span class="badge badge-amber">${admin.verification_status}</span>`;
+
+                        const card = document.createElement('div');
+                        card.className = 'admin-card';
+                        card.innerHTML = `
+                            <div class="admin-info">
+                                <h4>${admin.full_name}</h4>
+                                <p><strong>Email:</strong> ${admin.email}</p>
+                                <p><strong>Phone:</strong> ${admin.phone || 'N/A'}</p>
+                                <p><strong>Department:</strong> ${admin.department}</p>
+                                <p><strong>Created:</strong> ${formatDate(admin.created_at)}</p>
+                            </div>
+                            <div>${statusBadge}</div>
+                        `;
+                        list.appendChild(card);
+                    });
+                }
+            } catch (err) {
+                console.error('Error loading admins:', err);
+                showToast('Failed to load admins', 'error');
+            }
+        }
+
+        // Approve admin
+        async function approveAdmin(adminVerificationId) {
+            try {
+                const auth = getAuth();
+                if (!auth) return;
+
+                const response = await fetch(`${API_BASE}/admin/verify-admin/${adminVerificationId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${auth.token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: 'Approved' })
+                });
+
+                if (!response.ok) throw new Error('Failed to approve admin');
+                
+                showToast('Admin approved successfully!', 'success');
+                loadPendingAdmins();
+                loadAccessLog();
+                loadAllAdmins();
+            } catch (err) {
+                console.error('Error approving admin:', err);
+                showToast('Failed to approve admin', 'error');
+            }
+        }
+
+        // Show reject modal
+        function showRejectModal(adminVerificationId) {
+            document.getElementById('rejection-admin-id').value = adminVerificationId;
+            document.getElementById('rejection-modal').classList.add('active');
+        }
+
+        // Handle rejection form
+        document.getElementById('rejection-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            try {
+                const auth = getAuth();
+                if (!auth) return;
+
+                const adminId = document.getElementById('rejection-admin-id').value;
+                const reason = document.getElementById('rejection-reason').value;
+
+                const response = await fetch(`${API_BASE}/admin/verify-admin/${adminId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${auth.token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ status: 'Rejected', reason })
+                });
+
+                if (!response.ok) throw new Error('Failed to reject admin');
+                
+                showToast('Admin rejected successfully!', 'success');
+                document.getElementById('rejection-modal').classList.remove('active');
+                document.getElementById('rejection-form').reset();
+                loadPendingAdmins();
+                loadAccessLog();
+            } catch (err) {
+                console.error('Error rejecting admin:', err);
+                showToast('Failed to reject admin', 'error');
+            }
+        });
+
+        // Initial load
+        loadPendingAdmins();
+        loadAccessLog();
+        loadAllAdmins();
+
+        // Refresh every 30 seconds
+        setInterval(() => {
+            loadPendingAdmins();
+            loadAccessLog();
+            loadAllAdmins();
+        }, 30000);
+    </script>
+</body>
+</html>

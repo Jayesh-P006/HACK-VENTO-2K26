@@ -5,7 +5,7 @@ Comprehensive management and analytics endpoints for admin users
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, StudentVerification, StudentBlacklist, Department, BatchYear, Skill, PlacementStats, CompanyVisit, Student, User, Application, OfferLetter, Job
+from models import db, StudentVerification, StudentBlacklist, Department, BatchYear, Skill, PlacementStats, CompanyVisit, Student, User, Application, OfferLetter, Job, Admin, AdminVerification, AdminAccessLog
 from datetime import datetime, timedelta
 from sqlalchemy import func, and_, or_, case
 from sqlalchemy.orm import aliased
@@ -1186,4 +1186,167 @@ def create_announcement():
         }), 201
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# ============ ADMIN VERIFICATION ENDPOINTS ============
+
+@admin_bp.route('/pending-admins', methods=['GET'])
+@jwt_required()
+def get_pending_admins():
+    """Get all pending admin verification requests"""
+    try:
+        user_id = get_user_id()
+        if not check_admin(user_id):
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        from models import AdminVerification, Admin
+        
+        pending = AdminVerification.query.filter_by(status='Pending').all()
+        data = [v.to_dict() for v in pending]
+        
+        return jsonify({
+            'success': True,
+            'count': len(data),
+            'data': data
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/verify-admin/<int:admin_verification_id>', methods=['POST'])
+@jwt_required()
+def verify_admin(admin_verification_id):
+    """Approve or reject admin verification"""
+    try:
+        user_id = get_user_id()
+        if not check_admin(user_id):
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        from models import AdminVerification, AdminAccessLog
+        
+        data = request.get_json()
+        status = data.get('status')  # 'Approved' or 'Rejected'
+        reason = data.get('reason', '')
+        
+        if status not in ['Approved', 'Rejected']:
+            return jsonify({'error': 'Invalid status'}), 400
+        
+        verification = AdminVerification.query.get(admin_verification_id)
+        if not verification:
+            return jsonify({'error': 'Verification record not found'}), 404
+        
+        verification.status = status
+        verification.verification_date = datetime.utcnow()
+        verification.approved_by = user_id
+        if status == 'Rejected':
+            verification.rejection_reason = reason
+        
+        # Update admin user verification status if approved
+        if status == 'Approved':
+            admin = verification.admin
+            admin_user = User.query.get(admin.user_id)
+            if admin_user:
+                admin_user.is_verified = True
+        
+        # Create access log
+        access_log = AdminAccessLog(
+            admin_id=verification.admin_id,
+            action='verified',
+            status=status,
+            details=f'Admin verification {status.lower()}' + (f': {reason}' if reason else ''),
+            performed_by=user_id
+        )
+        
+        db.session.add(access_log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Admin {status.lower()} successfully',
+            'verification': verification.to_dict()
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/admin-access-log', methods=['GET'])
+@jwt_required()
+def get_admin_access_log():
+    """Get the access log for all admins - who has admin access and when"""
+    try:
+        user_id = get_user_id()
+        if not check_admin(user_id):
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        from models import AdminAccessLog, Admin, User as UserModel
+        
+        # Get all admin creation and verification events
+        logs = AdminAccessLog.query.order_by(AdminAccessLog.timestamp.desc()).all()
+        
+        data = []
+        for log in logs:
+            admin = log.admin
+            user = UserModel.query.get(admin.user_id) if admin else None
+            
+            data.append({
+                'log_id': log.id,
+                'admin_id': log.admin_id,
+                'admin_name': admin.full_name if admin else 'Unknown',
+                'admin_email': admin.email if admin else 'Unknown',
+                'department': admin.department if admin else 'Unknown',
+                'action': log.action,
+                'status': log.status,
+                'details': log.details,
+                'performed_by': log.performer.email if log.performer else 'System',
+                'timestamp': log.timestamp.isoformat(),
+                'user_verified': user.is_verified if user else False
+            })
+        
+        return jsonify({
+            'success': True,
+            'total_admins': len(set(l['admin_id'] for l in data)),
+            'total_logs': len(data),
+            'logs': data
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/admins', methods=['GET'])
+@jwt_required()
+def get_all_admins():
+    """Get list of all admins with their status"""
+    try:
+        user_id = get_user_id()
+        if not check_admin(user_id):
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        from models import Admin
+        
+        admins = Admin.query.all()
+        data = []
+        
+        for admin in admins:
+            user = User.query.get(admin.user_id)
+            verification = admin.verification_record if hasattr(admin, 'verification_record') else None
+            
+            data.append({
+                'admin_id': admin.id,
+                'user_id': admin.user_id,
+                'full_name': admin.full_name,
+                'email': admin.email,
+                'phone': admin.phone,
+                'department': admin.department,
+                'verified': user.is_verified if user else False,
+                'verification_status': verification.status if verification else 'Unknown',
+                'created_at': admin.created_at.isoformat()
+            })
+        
+        return jsonify({
+            'success': True,
+            'count': len(data),
+            'admins': data
+        }), 200
+    except Exception as e:
         return jsonify({'error': str(e)}), 500

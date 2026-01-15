@@ -834,3 +834,93 @@ class BatchSessionMapping(db.Model):
 # - students.batch_id -> FK to batches.id
 # - jobs.session_id -> FK to placement_sessions.id  
 # - applications.session_id -> FK to placement_sessions.id
+
+
+class Admin(db.Model):
+    """Admin profile for admin users (role_id=3)"""
+    __tablename__ = 'admins'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    full_name = db.Column(db.String(255), nullable=False)
+    email = db.Column(db.String(255), nullable=False)
+    phone = db.Column(db.String(15))
+    department = db.Column(db.String(100))  # e.g., "Placement Cell", "HR", etc.
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref='admin_profile', uselist=False)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'full_name': self.full_name,
+            'email': self.email,
+            'phone': self.phone,
+            'department': self.department,
+            'created_at': self.created_at.isoformat()
+        }
+
+
+class AdminVerification(db.Model):
+    """Verification queue for newly registered admin accounts"""
+    __tablename__ = 'admin_verification'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('admins.id'), unique=True, nullable=False)
+    status = db.Column(db.Enum('Pending', 'Approved', 'Rejected'), default='Pending')
+    
+    # Verification details
+    verification_date = db.Column(db.DateTime)
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'))  # Super admin who approved
+    rejection_reason = db.Column(db.Text)
+    
+    submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    admin = db.relationship('Admin', backref='verification_record')
+    approver = db.relationship('User', backref='approved_admins')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'admin_id': self.admin_id,
+            'admin_name': self.admin.full_name if self.admin else None,
+            'email': self.admin.email if self.admin else None,
+            'department': self.admin.department if self.admin else None,
+            'status': self.status,
+            'rejection_reason': self.rejection_reason,
+            'submitted_at': self.submitted_at.isoformat(),
+            'verification_date': self.verification_date.isoformat() if self.verification_date else None
+        }
+
+
+class AdminAccessLog(db.Model):
+    """Log of all admin access and permissions changes"""
+    __tablename__ = 'admin_access_log'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    admin_id = db.Column(db.Integer, db.ForeignKey('admins.id'), nullable=False)
+    action = db.Column(db.String(100), nullable=False)  # 'created', 'verified', 'promoted', 'revoked', etc.
+    status = db.Column(db.String(50))  # 'Approved', 'Rejected', 'Pending', etc.
+    details = db.Column(db.Text)  # JSON details of the action
+    performed_by = db.Column(db.Integer, db.ForeignKey('users.id'))  # Admin who performed the action
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    admin = db.relationship('Admin', backref='access_logs')
+    performer = db.relationship('User', backref='performed_actions', foreign_keys=[performed_by])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'admin_id': self.admin_id,
+            'admin_name': self.admin.full_name if self.admin else None,
+            'action': self.action,
+            'status': self.status,
+            'details': self.details,
+            'performed_by': self.performer.email if self.performer else None,
+            'timestamp': self.timestamp.isoformat()
+        }

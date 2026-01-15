@@ -393,6 +393,7 @@
                 <button class="tab-btn" onclick="switchTab('blacklist')">🚫 Blacklist</button>
                 <button class="tab-btn" onclick="switchTab('master')">⚙️ Master Data</button>
                 <button class="tab-btn" onclick="switchTab('announcements')">📢 Announcements</button>
+                <a href="admin-access-control.html" class="tab-btn" style="text-decoration: none; display: flex; align-items: center;">🔐 Admin Access</a>
             </div>
 
             <!-- Overview Tab -->
@@ -465,6 +466,17 @@
 
             <!-- Verification Queue Tab -->
             <div id="tab-verification" class="tab-content">
+                <!-- Admin Verification Section -->
+                <div class="card glass" style="padding: 24px; margin-bottom: 24px;">
+                    <div class="section-header">
+                        <h3>🔐 Admin Verification Queue</h3>
+                        <span id="adminVerificationCount" class="badge" style="background: rgba(217, 119, 6, 0.2); color: #d97706;">0</span>
+                    </div>
+                    <div id="adminVerificationList" style="display: grid; gap: 12px;"></div>
+                    <div id="noAdminVerification" class="empty-state" style="padding: 32px; text-align: center; display: none;">✓ No pending admin verifications</div>
+                </div>
+
+                <!-- Student Verification Section -->
                 <div class="card glass" style="padding: 24px;">
                     <div class="section-header">
                         <h3>Student Verification Queue</h3>
@@ -688,7 +700,10 @@
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('tab-' + tabName).classList.add('active');
             event.target.classList.add('active');
-            if (tabName === 'verification') loadVerificationQueue();
+            if (tabName === 'verification') {
+                loadVerificationQueue();
+                loadAdminVerificationQueue();
+            }
             if (tabName === 'companies') loadCompanyProgress();
         }
 
@@ -1040,6 +1055,56 @@
             if (!reason) return;
             const res = await apiCall(`/admin/verification/${id}/reject`, 'POST', { reason });
             if (res.success) { showToast('Verification rejected', 'success'); loadVerificationQueue(); } else { showToast(res.error || 'Failed', 'error'); }
+        }
+
+        // Admin Verification Functions
+        async function loadAdminVerificationQueue() {
+            try {
+                const data = await apiCall('/admin/pending-admins');
+                const container = document.getElementById('adminVerificationList');
+                const countBadge = document.getElementById('adminVerificationCount');
+                
+                if (!data.data || data.data.length === 0) {
+                    document.getElementById('noAdminVerification').style.display = 'block';
+                    container.innerHTML = '';
+                    countBadge.textContent = '0';
+                    return;
+                }
+                
+                document.getElementById('noAdminVerification').style.display = 'none';
+                countBadge.textContent = data.data.length;
+                
+                container.innerHTML = data.data.map(admin => `
+                    <div style="padding: 16px; background: var(--element); border-radius: var(--radius-sm); border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h4 style="margin: 0 0 4px 0;">${admin.admin_name || 'Unknown'}</h4>
+                            <p style="margin: 0 0 4px 0; font-size: 12px; color: var(--muted);"><strong>Email:</strong> ${admin.email}</p>
+                            <p style="margin: 0 0 4px 0; font-size: 12px; color: var(--muted);"><strong>Department:</strong> ${admin.department || 'N/A'}</p>
+                            <p style="margin: 0; font-size: 12px; color: var(--muted);"><strong>Applied:</strong> ${new Date(admin.submitted_at).toLocaleDateString()}</p>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="action-btn approve" onclick="approveAdmin(${admin.id})">Approve</button>
+                            <button class="action-btn reject" onclick="rejectAdmin(${admin.id})">Reject</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch(e) { 
+                console.error('Failed to load admin verification queue:', e);
+                document.getElementById('noAdminVerification').style.display = 'block';
+            }
+        }
+
+        async function approveAdmin(id) {
+            if (!confirm('Approve this admin account?')) return;
+            const res = await apiCall(`/admin/verify-admin/${id}`, 'POST', { status: 'Approved' });
+            if (res.success) { showToast('Admin approved!', 'success'); loadAdminVerificationQueue(); } else { showToast(res.error || 'Failed', 'error'); }
+        }
+
+        async function rejectAdmin(id) {
+            const reason = prompt('Rejection reason:');
+            if (!reason) return;
+            const res = await apiCall(`/admin/verify-admin/${id}`, 'POST', { status: 'Rejected', reason });
+            if (res.success) { showToast('Admin rejected', 'success'); loadAdminVerificationQueue(); } else { showToast(res.error || 'Failed', 'error'); }
         }
 
         async function loadPendingJobs() {

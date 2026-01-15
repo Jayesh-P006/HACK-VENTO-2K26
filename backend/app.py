@@ -6,7 +6,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
 from models import db, User, Student, Company, Job, Application, Announcement, StudentVerification
-from models import HiringRound, ApplicationRound, OfferLetter, Batch
+from models import HiringRound, ApplicationRound, OfferLetter, Batch, Admin, AdminVerification, AdminAccessLog
 from sqlalchemy import func, or_, and_
 import openpyxl
 from io import BytesIO
@@ -256,7 +256,7 @@ def get_active_batches():
 
 @app.route('/api/auth/register', methods=['POST'])
 def register():
-    """Register a new user (Student or Company)"""
+    """Register a new user (Student, Company, or Admin)"""
     try:
         data = request.get_json()
         
@@ -267,7 +267,7 @@ def register():
         # Create user
         user = User(
             email=data['email'],
-            role_id=data['role_id'],  # 1=Student, 2=Company
+            role_id=data['role_id'],  # 1=Student, 2=Company, 3=Admin
             is_verified=False
         )
         user.set_password(data['password'])
@@ -306,6 +306,38 @@ def register():
                 hr_phone=data.get('hr_phone', '')
             )
             db.session.add(company)
+        
+        elif data['role_id'] == 3:  # Admin
+            # Verify admin creation key (optional - can be set via environment variable)
+            admin_key = os.getenv('ADMIN_CREATION_KEY', '')
+            if admin_key and data.get('verification_key') != admin_key:
+                return jsonify({'error': 'Invalid admin verification key'}), 403
+            
+            admin = Admin(
+                user_id=user.id,
+                full_name=data['full_name'],
+                email=data['email'],
+                phone=data.get('phone', ''),
+                department=data.get('department', 'Coordinator')
+            )
+            db.session.add(admin)
+            db.session.flush()
+            
+            # Create admin verification request
+            admin_verification = AdminVerification(
+                admin_id=admin.id,
+                status='Pending'
+            )
+            db.session.add(admin_verification)
+            
+            # Create initial access log
+            access_log = AdminAccessLog(
+                admin_id=admin.id,
+                action='created',
+                status='Pending',
+                details=f'Admin account created for {data.get("department", "Coordinator")} department'
+            )
+            db.session.add(access_log)
         
         db.session.commit()
         
