@@ -485,7 +485,7 @@ def register():
         if data['role_id'] == 1:  # Student
             verification_record = StudentVerification.query.filter_by(student_id=user.student.id).first()
         elif data['role_id'] == 3:  # Admin
-            verification_record = AdminVerification.query.filter_by(admin_id=user.admin.id).first()
+            verification_record = AdminVerification.query.filter_by(admin_id=user.admin_profile.id).first()
         
         # Generate and store OTP
         email_sent = None
@@ -558,7 +558,7 @@ def send_otp():
             full_name = student.full_name
             role_type = 'student'
         elif user.role_id == 3:  # Admin
-            admin = user.admin
+            admin = user.admin_profile
             if not admin:
                 return jsonify({'error': 'Admin profile not found'}), 404
             verification_record = AdminVerification.query.filter_by(admin_id=admin.id).first()
@@ -642,7 +642,7 @@ def verify_otp():
             full_name = student.full_name
             role_type = 'student'
         elif user.role_id == 3:  # Admin
-            admin = user.admin
+            admin = user.admin_profile
             if not admin:
                 return jsonify({'error': 'Admin profile not found'}), 404
             verification_record = AdminVerification.query.filter_by(admin_id=admin.id).first()
@@ -727,8 +727,8 @@ def login():
             verification_record = None
             if user.role_id == 1 and user.student:
                 verification_record = StudentVerification.query.filter_by(student_id=user.student.id).first()
-            elif user.role_id == 3 and user.admin:
-                verification_record = AdminVerification.query.filter_by(admin_id=user.admin.id).first()
+            elif user.role_id == 3 and user.admin_profile:
+                verification_record = AdminVerification.query.filter_by(admin_id=user.admin_profile.id).first()
             if not verification_record or not verification_record.otp_verified:
                 return jsonify({'error': 'Email not verified. Please complete OTP verification.'}), 403
 
