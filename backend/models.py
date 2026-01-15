@@ -444,6 +444,13 @@ class StudentVerification(db.Model):
     student_id = db.Column(db.Integer, db.ForeignKey('students.id'), unique=True, nullable=False)
     status = db.Column(db.Enum('Pending', 'Verified', 'Rejected'), default='Pending')
     
+    # EMAIL OTP VERIFICATION
+    otp = db.Column(db.String(6))  # 6-digit OTP
+    otp_verified = db.Column(db.Boolean, default=False)  # Has email been verified?
+    otp_sent_at = db.Column(db.DateTime)  # When OTP was sent
+    otp_verified_at = db.Column(db.DateTime)  # When OTP was verified
+    otp_attempts = db.Column(db.Integer, default=0)  # Failed OTP attempts
+    
     # Document details
     marksheet_10th_url = db.Column(db.String(500))
     marksheet_12th_url = db.Column(db.String(500))
@@ -870,6 +877,13 @@ class AdminVerification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     admin_id = db.Column(db.Integer, db.ForeignKey('admins.id'), unique=True, nullable=False)
     status = db.Column(db.Enum('Pending', 'Approved', 'Rejected'), default='Pending')
+    
+    # EMAIL OTP VERIFICATION
+    otp = db.Column(db.String(6))  # 6-digit OTP
+    otp_verified = db.Column(db.Boolean, default=False)  # Has email been verified?
+    otp_sent_at = db.Column(db.DateTime)  # When OTP was sent
+    otp_verified_at = db.Column(db.DateTime)  # When OTP was verified
+    otp_attempts = db.Column(db.Integer, default=0)  # Failed OTP attempts
     
     # Verification details
     verification_date = db.Column(db.DateTime)

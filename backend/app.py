@@ -6,6 +6,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from dotenv import load_dotenv
 from models import db, User, Student, Company, Job, Application, Announcement, StudentVerification
+from otp_service import generate_otp, send_otp_email, is_otp_valid, send_approval_pending_email
 from models import HiringRound, ApplicationRound, OfferLetter, Batch, Admin, AdminVerification, AdminAccessLog, Department
 from sqlalchemy import func, or_, and_
 import openpyxl
@@ -407,9 +408,38 @@ def register():
         db.session.commit()
         print(f'[REGISTER] SUCCESS: User {data["email"]} registered successfully')
         
+        # Send OTP email for verification
+        print(f'[REGISTER] Generating and sending OTP...')
+        role_type = 'student' if data['role_id'] == 1 else 'admin' if data['role_id'] == 3 else 'company'
+        full_name = data.get('full_name') or data.get('company_name', 'User')
+        
+        # Get the verification record (Student or Admin)
+        verification_record = None
+        if data['role_id'] == 1:  # Student
+            verification_record = StudentVerification.query.filter_by(student_id=user.student.id).first()
+        elif data['role_id'] == 3:  # Admin
+            verification_record = AdminVerification.query.filter_by(admin_id=user.admin.id).first()
+        
+        # Generate and store OTP
+        if verification_record:
+            otp = generate_otp()
+            verification_record.otp = otp
+            verification_record.otp_sent_at = datetime.utcnow()
+            verification_record.otp_verified = False
+            verification_record.otp_attempts = 0
+            db.session.commit()
+            print(f'[REGISTER] OTP generated and stored: {otp}')
+            
+            # Send OTP email
+            send_otp_email(data['email'], full_name, otp)
+            print(f'[REGISTER] OTP email sent to {data["email"]}')
+        
         return jsonify({
-            'message': 'Registration successful. Please wait for admin verification.',
-            'user': user.to_dict()
+            'message': f'Registration successful! OTP sent to {data["email"]}. Please verify your email.',
+            'user': user.to_dict(),
+            'role_type': role_type,
+            'email': data['email'],
+            'next_step': 'otp_verification'
         }), 201
         
     except Exception as e:
@@ -424,6 +454,192 @@ def register():
         except:
             pass
         
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/auth/send-otp', methods=['POST'])
+def send_otp():
+    """Send OTP to user email for verification"""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        
+        if not email:
+            return jsonify({'error': 'Email is required'}), 400
+        
+        print(f'\n[OTP] ========== SEND OTP REQUEST ==========')
+        print(f'[OTP] Email: {email}')
+        
+        # Find user
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            print(f'[OTP] User not found: {email}')
+            return jsonify({'error': 'Email not registered'}), 404
+        
+        # Get verification record
+        verification_record = None
+        full_name = 'User'
+        role_type = None
+        
+        if user.role_id == 1:  # Student
+            student = user.student
+            if not student:
+                return jsonify({'error': 'Student profile not found'}), 404
+            verification_record = StudentVerification.query.filter_by(student_id=student.id).first()
+            full_name = student.full_name
+            role_type = 'student'
+        elif user.role_id == 3:  # Admin
+            admin = user.admin
+            if not admin:
+                return jsonify({'error': 'Admin profile not found'}), 404
+            verification_record = AdminVerification.query.filter_by(admin_id=admin.id).first()
+            full_name = admin.full_name
+            role_type = 'admin'
+        else:
+            return jsonify({'error': 'Invalid user role for OTP verification'}), 400
+        
+        if not verification_record:
+            print(f'[OTP] Verification record not found for user: {email}')
+            return jsonify({'error': 'Verification record not found'}), 404
+        
+        # Generate new OTP
+        otp = generate_otp()
+        verification_record.otp = otp
+        verification_record.otp_sent_at = datetime.utcnow()
+        verification_record.otp_verified = False
+        verification_record.otp_attempts = 0
+        db.session.commit()
+        
+        print(f'[OTP] OTP generated: {otp}')
+        
+        # Send OTP email
+        email_sent = send_otp_email(email, full_name, otp)
+        
+        if not email_sent:
+            print(f'[OTP] Failed to send OTP email')
+            return jsonify({
+                'success': False,
+                'error': 'Failed to send OTP email. Please try again.',
+                'message': 'Could not send verification code. Check your email settings.'
+            }), 500
+        
+        print(f'[OTP] OTP sent successfully to {email}')
+        
+        return jsonify({
+            'success': True,
+            'message': f'OTP sent to {email}',
+            'email': email,
+            'otp_length': 6
+        }), 200
+        
+    except Exception as e:
+        print(f'[OTP] EXCEPTION in send_otp: {str(e)}')
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/auth/verify-otp', methods=['POST'])
+def verify_otp():
+    """Verify OTP submitted by user"""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        otp = data.get('otp')
+        
+        if not email or not otp:
+            return jsonify({'error': 'Email and OTP are required'}), 400
+        
+        print(f'\n[OTP] ========== VERIFY OTP REQUEST ==========')
+        print(f'[OTP] Email: {email}')
+        print(f'[OTP] OTP submitted: {otp}')
+        
+        # Find user
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            print(f'[OTP] User not found: {email}')
+            return jsonify({'error': 'Email not registered'}), 404
+        
+        # Get verification record
+        verification_record = None
+        full_name = 'User'
+        role_type = None
+        
+        if user.role_id == 1:  # Student
+            student = user.student
+            if not student:
+                return jsonify({'error': 'Student profile not found'}), 404
+            verification_record = StudentVerification.query.filter_by(student_id=student.id).first()
+            full_name = student.full_name
+            role_type = 'student'
+        elif user.role_id == 3:  # Admin
+            admin = user.admin
+            if not admin:
+                return jsonify({'error': 'Admin profile not found'}), 404
+            verification_record = AdminVerification.query.filter_by(admin_id=admin.id).first()
+            full_name = admin.full_name
+            role_type = 'admin'
+        else:
+            return jsonify({'error': 'Invalid user role for OTP verification'}), 400
+        
+        if not verification_record:
+            print(f'[OTP] Verification record not found for user: {email}')
+            return jsonify({'error': 'Verification record not found'}), 404
+        
+        # Check OTP validity
+        if not is_otp_valid(verification_record):
+            print(f'[OTP] OTP expired for {email}')
+            return jsonify({
+                'error': 'OTP has expired',
+                'message': 'Your verification code has expired. Please request a new one.',
+                'expired': True
+            }), 400
+        
+        # Check OTP attempts
+        if verification_record.otp_attempts >= 5:
+            print(f'[OTP] Too many failed attempts for {email}')
+            return jsonify({
+                'error': 'Too many failed attempts. Please request a new OTP.',
+                'too_many_attempts': True
+            }), 429
+        
+        # Verify OTP
+        if verification_record.otp != otp:
+            verification_record.otp_attempts += 1
+            db.session.commit()
+            attempts_left = 5 - verification_record.otp_attempts
+            
+            print(f'[OTP] OTP mismatch for {email}. Attempts left: {attempts_left}')
+            
+            return jsonify({
+                'error': 'Invalid OTP',
+                'message': f'Incorrect verification code. {attempts_left} attempts remaining.',
+                'attempts_remaining': attempts_left
+            }), 401
+        
+        # OTP verified successfully
+        verification_record.otp_verified = True
+        verification_record.otp_verified_at = datetime.utcnow()
+        verification_record.otp_attempts = 0
+        db.session.commit()
+        
+        print(f'[OTP] OTP verified successfully for {email}')
+        
+        # Send approval pending email
+        send_approval_pending_email(email, full_name, role_type)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Email verified successfully!',
+            'email_verified': True,
+            'user': user.to_dict(),
+            'next_step': 'await_admin_approval'
+        }), 200
+        
+    except Exception as e:
+        print(f'[OTP] EXCEPTION in verify_otp: {str(e)}')
+        import traceback
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 
