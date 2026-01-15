@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from models import db, User, Student, Company, Job, Application, Announcement, StudentVerification
 from otp_service import generate_otp, send_otp_email, is_otp_valid, send_approval_pending_email
 from models import HiringRound, ApplicationRound, OfferLetter, Batch, Admin, AdminVerification, AdminAccessLog, Department
-from sqlalchemy import func, or_, and_
+from sqlalchemy import func, or_, and_, text
 import openpyxl
 from io import BytesIO
 from werkzeug.exceptions import HTTPException
@@ -55,6 +55,28 @@ def _maybe_init_database():
                 print('[db] users table missing; creating all tables...')
                 db.create_all()
 
+            def ensure_otp_columns(table_name):
+                if not inspector.has_table(table_name):
+                    return
+                existing_cols = {col['name'] for col in inspector.get_columns(table_name)}
+                columns_to_add = []
+                if 'otp' not in existing_cols:
+                    columns_to_add.append("ADD COLUMN otp VARCHAR(6)")
+                if 'otp_verified' not in existing_cols:
+                    columns_to_add.append("ADD COLUMN otp_verified BOOLEAN DEFAULT FALSE")
+                if 'otp_sent_at' not in existing_cols:
+                    columns_to_add.append("ADD COLUMN otp_sent_at DATETIME")
+                if 'otp_verified_at' not in existing_cols:
+                    columns_to_add.append("ADD COLUMN otp_verified_at DATETIME")
+                if 'otp_attempts' not in existing_cols:
+                    columns_to_add.append("ADD COLUMN otp_attempts INT DEFAULT 0")
+
+                for column_sql in columns_to_add:
+                    print(f"[db] Adding {table_name} column: {column_sql}")
+                    db.session.execute(text(f"ALTER TABLE {table_name} {column_sql}"))
+                if columns_to_add:
+                    db.session.commit()
+
             # Seed master data (departments, batches, skills)
             if not has_departments or Department.query.count() == 0:
                 print('[db] seeding departments...')
@@ -84,6 +106,10 @@ def _maybe_init_database():
                     if not Batch.query.filter_by(batch_code=batch_data['batch_code']).first():
                         db.session.add(Batch(**batch_data))
                 db.session.commit()
+
+            # Ensure OTP columns exist for verification tables
+            ensure_otp_columns('student_verification')
+            ensure_otp_columns('admin_verification')
 
             seed = os.getenv('SEED_DEMO_USERS', '1').strip().lower() in ('1', 'true', 'yes', 'y', 'on')
             if not seed:
