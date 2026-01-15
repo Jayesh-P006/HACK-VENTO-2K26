@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Silent Syntax Portal · Register</title>
+  <link rel="icon" type="image/png" href="/brand/silent-syntax-icon.png" />
   <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
@@ -227,7 +228,7 @@
 
       if (role === 1) {
         // Student validation
-        if (!formData.get('full_name') || !formData.get('enrollment_number') || !formData.get('branch') || !formData.get('cgpa') || !formData.get('graduation_year') || !formData.get('phone')) {
+        if (!formData.get('full_name') || !formData.get('enrollment_number') || !formData.get('branch') || !formData.get('cgpa') || !formData.get('graduation_year') || !formData.get('current_year') || !formData.get('phone')) {
           showToast('Please fill all required student fields', 'error');
           return;
         }

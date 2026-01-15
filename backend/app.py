@@ -307,6 +307,9 @@ def get_student_jobs():
             return jsonify({'error': 'Unauthorized'}), 403
         
         student = user.student
+        if not student:
+            return jsonify({'error': 'Student profile not found'}), 404
+            
         student_branch = student.branch.lower() if student.branch else ''
         student_cgpa = student.cgpa or 0
         
