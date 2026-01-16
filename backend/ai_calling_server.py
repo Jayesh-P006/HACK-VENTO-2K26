@@ -338,16 +338,34 @@ def register_ai_calling_routes(app: FastAPI) -> None:
         if not ws_url:
             raise HTTPException(status_code=500, detail="Cannot determine WebSocket URL for Twilio")
 
+        stream_status_url = f"{public_url}/twilio/stream-status"
+
         twiml = f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <Response>
   <Say voice=\"alice\">Hello! Connecting you to Silent Syntax placement assistant.</Say>
   <Connect>
-    <Stream url=\"{ws_url}\" />
+    <Stream url=\"{ws_url}\" statusCallback=\"{stream_status_url}\" statusCallbackMethod=\"POST\" statusCallbackEvent=\"start end\" />
   </Connect>
+  <Pause length=\"600\" />
 </Response>"""
 
         # Twilio reliably parses `text/xml`.
         return Response(content=twiml, media_type="text/xml")
+
+    @app.post("/twilio/stream-status")
+    async def twilio_stream_status(request: Request):
+        # Twilio sends application/x-www-form-urlencoded
+        try:
+            form = await request.form()
+            payload = dict(form)
+        except Exception:
+            try:
+                payload = await request.json()
+            except Exception:
+                payload = {"raw": (await request.body()).decode("utf-8", errors="ignore")}
+
+        print(f"[twilio-stream] {payload}")
+        return {"success": True}
 
     @app.post("/call")
     async def trigger_call(request: Request):
