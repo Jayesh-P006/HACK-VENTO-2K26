@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from threading import Thread
 
 import httpx
 from flask import Blueprint, jsonify, request
@@ -199,35 +198,44 @@ def request_ai_call():
 
         if self_hosted:
             # Avoid HTTP self-calls (can time out behind proxies).
-            # Also do not block the HTTP request on Twilio latency.
+            # For reliability and debuggability, initiate Twilio call synchronously
+            # so we can return call_sid or a clear Twilio error.
 
-            def _background_initiate_call():
+            missing = [k for k in (
+                'TWILIO_ACCOUNT_SID',
+                'TWILIO_AUTH_TOKEN',
+                'TWILIO_FROM_NUMBER',
+                'CALLING_PUBLIC_URL',
+            ) if not (os.getenv(k) or '').strip()]
+            if missing:
+                return jsonify({
+                    'success': False,
+                    'error': 'AI calling is not configured on the server (missing Twilio env vars)',
+                    'missing': missing,
+                }), 500
+
+            # Best-effort persist overrides (don't fail call if DB write fails)
+            if db_changed:
                 try:
-                    # Best-effort persist overrides without blocking.
-                    if db_changed:
-                        try:
-                            db.session.commit()
-                        except Exception:
-                            db.session.rollback()
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
 
-                    from ai_calling_twilio import initiate_twilio_call
+            try:
+                from ai_calling_twilio import initiate_twilio_call
 
-                    result = initiate_twilio_call(phone_for_call)
-                    print('[AI_CALLING] Twilio call initiated:', result)
-                except Exception as e:
-                    print('[AI_CALLING] Failed to initiate call:', str(e))
-
-            Thread(target=_background_initiate_call, daemon=True).start()
-
-            return jsonify({
-                'success': True,
-                'message': 'Call is being initiated',
-                'calling_service_status': 202,
-                'calling_service_response': {
-                    'queued': True,
-                    'to': phone_for_call,
-                },
-            }), 202
+                result = initiate_twilio_call(phone_for_call)
+                return jsonify({
+                    'success': True,
+                    'message': 'Call initiated',
+                    'calling_service_status': 200,
+                    'calling_service_response': result,
+                }), 200
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': f'Failed to initiate call: {str(e)}',
+                }), 502
 
         url = f'{service_url}{endpoint}'
         timeout = httpx.Timeout(timeout_s, connect=min(5.0, timeout_s))
