@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
+from threading import Thread
 
 import httpx
 from flask import Blueprint, jsonify, request
@@ -172,12 +173,6 @@ def request_ai_call():
 
         name_for_call = override_name or (student.full_name or '').strip()
 
-        if db_changed:
-            try:
-                db.session.commit()
-            except Exception:
-                db.session.rollback()
-
         service_url = os.getenv('AI_CALLING_SERVICE_URL', '').strip().rstrip('/')
         self_hosted = not service_url
 
@@ -203,16 +198,36 @@ def request_ai_call():
             headers['Authorization'] = f'Bearer {token}'
 
         if self_hosted:
-            # Avoid HTTP self-calls (can time out behind proxies). Trigger Twilio directly.
-            from ai_calling_twilio import initiate_twilio_call
+            # Avoid HTTP self-calls (can time out behind proxies).
+            # Also do not block the HTTP request on Twilio latency.
 
-            result = initiate_twilio_call(phone_for_call)
+            def _background_initiate_call():
+                try:
+                    # Best-effort persist overrides without blocking.
+                    if db_changed:
+                        try:
+                            db.session.commit()
+                        except Exception:
+                            db.session.rollback()
+
+                    from ai_calling_twilio import initiate_twilio_call
+
+                    result = initiate_twilio_call(phone_for_call)
+                    print('[AI_CALLING] Twilio call initiated:', result)
+                except Exception as e:
+                    print('[AI_CALLING] Failed to initiate call:', str(e))
+
+            Thread(target=_background_initiate_call, daemon=True).start()
+
             return jsonify({
                 'success': True,
-                'message': 'Call request submitted',
-                'calling_service_status': 200,
-                'calling_service_response': result,
-            }), 200
+                'message': 'Call is being initiated',
+                'calling_service_status': 202,
+                'calling_service_response': {
+                    'queued': True,
+                    'to': phone_for_call,
+                },
+            }), 202
 
         url = f'{service_url}{endpoint}'
         timeout = httpx.Timeout(timeout_s, connect=min(5.0, timeout_s))
