@@ -162,8 +162,13 @@ def get_student_branch_counts():
             Student,
             or_(Student.branch == Department.code, Student.branch == Department.name)
         ).outerjoin(
+            User,
+            Student.user_id == User.id
+        ).outerjoin(
             latest_offer_subq,
             latest_offer_subq.c.student_id == Student.id
+        ).filter(
+            or_(User.is_verified == True, User.id == None)
         ).group_by(Department.id, Department.name, Department.code).all()
 
         data = []
@@ -296,6 +301,9 @@ def get_verification_queue():
         status_filter = request.args.get('status', 'Pending')
         
         query = StudentVerification.query
+        
+        # IMPORTANT: Only show students who have completed OTP verification
+        query = query.filter_by(otp_verified=True)
         
         if status_filter != 'All':
             query = query.filter_by(status=status_filter)
@@ -691,8 +699,10 @@ def get_placement_stats():
         stats = PlacementStats.query.order_by(PlacementStats.date.desc()).first()
         
         if not stats:
-            # Calculate from current data
-            total_students = Student.query.count()
+            # Calculate from current data - only count verified students
+            total_students = db.session.query(func.count(Student.id)).join(
+                User, Student.user_id == User.id
+            ).filter(User.is_verified == True).scalar() or 0
             
             # Count placed students (those with selected offers)
             placed_students = db.session.query(func.count(func.distinct(OfferLetter.student_id))).filter(
@@ -712,7 +722,17 @@ def get_placement_stats():
             dept_stats = {}
             departments = Department.query.all()
             for dept in departments:
-                dept_total = Student.query.filter_by(branch=dept.name).count()
+                dept_total = db.session.query(func.count(Student.id)).join(
+                    User, Student.user_id == User.id
+                ).filter(
+                    Student.branch == dept.name,
+                    User.is_verified == True
+                ).scalar() or 0
+                    User, Student.user_id == User.id
+                ).filter(
+                    Student.branch == dept.name,
+                    User.is_verified == True
+                ).scalar() or 0
                 dept_placed = db.session.query(func.count(func.distinct(OfferLetter.student_id))).join(
                     Student, OfferLetter.student_id == Student.id
                 ).filter(
@@ -834,7 +854,12 @@ def get_department_stats():
         stats = []
         
         for dept in departments:
-            total = Student.query.filter_by(branch=dept.name).count()
+            total = db.session.query(func.count(Student.id)).join(
+                User, Student.user_id == User.id
+            ).filter(
+                Student.branch == dept.name,
+                User.is_verified == True
+            ).scalar() or 0
             placed = db.session.query(func.count(func.distinct(OfferLetter.student_id))).join(
                 Student, OfferLetter.student_id == Student.id
             ).filter(
@@ -904,8 +929,10 @@ def get_placement_report():
         if not check_admin(user_id):
             return jsonify({'error': 'Unauthorized'}), 403
         
-        # Calculate all stats
-        total_students = Student.query.count()
+        # Calculate all stats - only count verified students
+        total_students = db.session.query(func.count(Student.id)).join(
+            User, Student.user_id == User.id
+        ).filter(User.is_verified == True).scalar() or 0
         placed_students = db.session.query(func.count(func.distinct(OfferLetter.student_id))).filter(
             OfferLetter.status.in_(['Sent', 'Accepted'])
         ).scalar() or 0
@@ -919,7 +946,12 @@ def get_placement_report():
         # Department breakdown
         dept_stats = []
         for dept in Department.query.all():
-            total = Student.query.filter_by(branch=dept.name).count()
+            total = db.session.query(func.count(Student.id)).join(
+                User, Student.user_id == User.id
+            ).filter(
+                Student.branch == dept.name,
+                User.is_verified == True
+            ).scalar() or 0
             placed = db.session.query(func.count(func.distinct(OfferLetter.student_id))).join(
                 Student, OfferLetter.student_id == Student.id
             ).filter(
@@ -963,8 +995,10 @@ def get_comprehensive_analytics():
         if not check_admin(user_id):
             return jsonify({'error': 'Unauthorized'}), 403
         
-        # Calculate overall stats
-        total_students = Student.query.count()
+        # Calculate overall stats - only count verified students
+        total_students = db.session.query(func.count(Student.id)).join(
+            User, Student.user_id == User.id
+        ).filter(User.is_verified == True).scalar() or 0
         placed_students = db.session.query(func.count(func.distinct(OfferLetter.student_id))).filter(
             OfferLetter.status.in_(['Sent', 'Accepted'])
         ).scalar() or 0
@@ -998,7 +1032,12 @@ def get_comprehensive_analytics():
             branch_names = [b[0] for b in branch_result if b[0]]
         
         for branch_name in branch_names:
-            total = Student.query.filter_by(branch=branch_name).count()
+            total = db.session.query(func.count(Student.id)).join(
+                User, Student.user_id == User.id
+            ).filter(
+                Student.branch == branch_name,
+                User.is_verified == True
+            ).scalar() or 0
             if total == 0:
                 continue
             placed = db.session.query(func.count(func.distinct(OfferLetter.student_id))).join(
@@ -1292,7 +1331,8 @@ def get_pending_admins():
         if not user or user.role_id != 3 or not user.is_verified:
             return jsonify({'success': False, 'data': []}), 200
         
-        pending = AdminVerification.query.filter_by(status='Pending').all()
+        # Only show admins who have completed OTP verification
+        pending = AdminVerification.query.filter_by(status='Pending', otp_verified=True).all()
         data = [v.to_dict() for v in pending]
         
         return jsonify({
@@ -1325,6 +1365,10 @@ def verify_admin(admin_verification_id):
         verification = AdminVerification.query.get(admin_verification_id)
         if not verification:
             return jsonify({'error': 'Verification record not found'}), 404
+        
+        # Ensure OTP is verified before admin approval
+        if not verification.otp_verified:
+            return jsonify({'error': 'Email not verified. Ask the admin to complete OTP verification first.'}), 400
         
         verification.status = status
         verification.verification_date = datetime.utcnow()

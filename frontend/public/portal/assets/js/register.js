@@ -56,9 +56,11 @@ form?.addEventListener('submit', async (e) => {
   submitBtn.disabled = true;
   submitBtn.textContent = 'Creating account...';
   try {
-    await api('/auth/register', { method: 'POST', body: payload });
-    showToast('Account created. Await verification.', 'success');
-    window.location.href = 'index.html';
+    const response = await api('/auth/register', { method: 'POST', body: payload });
+    showToast('Account created! Please verify your email.', 'success');
+    // Redirect to OTP verification page with email parameter
+    const email = encodeURIComponent(payload.email);
+    window.location.href = `verify-email-otp.html?email=${email}`;
   } catch (err) {
     showToast(err.message, 'error');
   } finally {

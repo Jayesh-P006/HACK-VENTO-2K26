@@ -415,13 +415,15 @@ def register():
             db.session.flush()  # Get student ID
             print(f'[REGISTER] Student created with ID: {student.id}')
             
-            # Create verification request for admin approval
+            # DON'T create StudentVerification yet - only after OTP verification
+            # Create temporary verification record to store OTP
             verification = StudentVerification(
                 student_id=student.id,
-                status='Pending'
+                status='Pending',
+                otp_verified=False
             )
             db.session.add(verification)
-            print(f'[REGISTER] StudentVerification created: {student.id}')
+            print(f'[REGISTER] Temporary verification record created for OTP: {student.id}')
         
         elif data['role_id'] == 2:  # Company
             print(f'[REGISTER] Creating Company profile...')
@@ -454,13 +456,14 @@ def register():
             db.session.flush()
             print(f'[REGISTER] Admin created with ID: {admin.id}')
             
-            # Create admin verification request
+            # Create admin verification request (not visible to admin until OTP verified)
             admin_verification = AdminVerification(
                 admin_id=admin.id,
-                status='Pending'
+                status='Pending',
+                otp_verified=False
             )
             db.session.add(admin_verification)
-            print(f'[REGISTER] AdminVerification created for admin {admin.id}')
+            print(f'[REGISTER] Temporary admin verification created for OTP: {admin.id}')
             
             # Create initial access log
             access_log = AdminAccessLog(
