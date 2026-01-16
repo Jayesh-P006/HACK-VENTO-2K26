@@ -140,8 +140,6 @@ def request_ai_call():
             return jsonify({'success': False, 'error': 'Student profile not found'}), 404
 
         phone = (student.phone or '').strip()
-        if not phone:
-            return jsonify({'success': False, 'error': 'Phone number missing in profile. Update your profile first.'}), 400
 
         data = request.get_json(silent=True) or {}
         topic = (data.get('topic') or '').strip()
@@ -151,19 +149,21 @@ def request_ai_call():
         override_name = (data.get('name') or '').strip()
         override_phone = _normalize_phone(data.get('phone'))
 
+        db_changed = False
+
         if override_name and not student.full_name:
             try:
                 student.full_name = override_name
                 db_changed = True
             except Exception:
-                db_changed = False
+                pass
 
         if override_phone and not phone:
             try:
                 student.phone = override_phone
                 db_changed = True
             except Exception:
-                db_changed = False
+                pass
 
         # Choose the phone used for the call.
         phone_for_call = override_phone or _normalize_phone(phone) or phone
@@ -172,12 +172,14 @@ def request_ai_call():
 
         name_for_call = override_name or (student.full_name or '').strip()
 
+        if db_changed:
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
         service_url = os.getenv('AI_CALLING_SERVICE_URL', '').strip().rstrip('/')
-        if not service_url:
-            # Default to same-origin when AI calling server is embedded in this backend.
-            scheme = request.headers.get('X-Forwarded-Proto', request.scheme) or 'https'
-            host = request.headers.get('X-Forwarded-Host', request.host)
-            service_url = f'{scheme}://{host}'.rstrip('/')
+        self_hosted = not service_url
 
         endpoint = (os.getenv('AI_CALLING_ENDPOINT', '/call').strip() or '/call')
         if not endpoint.startswith('/'):
@@ -200,8 +202,21 @@ def request_ai_call():
         if token:
             headers['Authorization'] = f'Bearer {token}'
 
+        if self_hosted:
+            # Avoid HTTP self-calls (can time out behind proxies). Trigger Twilio directly.
+            from ai_calling_twilio import initiate_twilio_call
+
+            result = initiate_twilio_call(phone_for_call)
+            return jsonify({
+                'success': True,
+                'message': 'Call request submitted',
+                'calling_service_status': 200,
+                'calling_service_response': result,
+            }), 200
+
         url = f'{service_url}{endpoint}'
-        with httpx.Client(timeout=timeout_s) as client:
+        timeout = httpx.Timeout(timeout_s, connect=min(5.0, timeout_s))
+        with httpx.Client(timeout=timeout) as client:
             resp = client.post(url, json=payload, headers=headers)
 
         content_type = resp.headers.get('content-type', '')
@@ -229,6 +244,8 @@ def request_ai_call():
             'calling_service_response': response_body,
         }), 200
 
+    except httpx.TimeoutException:
+        return jsonify({'success': False, 'error': 'Calling service timed out. Please try again.'}), 504
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 401
     except Exception as e:
