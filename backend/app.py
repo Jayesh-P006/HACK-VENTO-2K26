@@ -325,6 +325,7 @@ from learning_guide_routes import learning_guide_bp
 from hiring_rounds_routes import hiring_rounds_bp
 from session_routes import session_bp
 from email_reminder_routes import email_reminder_bp
+from ai_calling_routes import ai_calling_bp
 
 app.register_blueprint(company_bp)
 app.register_blueprint(admin_bp)
@@ -333,6 +334,7 @@ app.register_blueprint(learning_guide_bp)
 app.register_blueprint(hiring_rounds_bp)
 app.register_blueprint(session_bp)
 app.register_blueprint(email_reminder_bp)
+app.register_blueprint(ai_calling_bp)
 
 # ==================== Authentication Routes ====================
 

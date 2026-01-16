@@ -21,6 +21,7 @@
           <a href="#dashboard" id="nav-dashboard" class="active">Dashboard</a>
           <a href="#profile" id="nav-profile">My Profile</a>
           <a href="#learning-guide" id="nav-learning-guide">🎯 Learning Guide</a>
+          <a href="#ai-calling" id="nav-ai-calling">📞 AI Calling</a>
         </div>
         <div class="user-badge">
           <div class="user-avatar" data-user-avatar>A</div>
@@ -486,6 +487,42 @@
         </div>
       </div>
       <!-- END LEARNING GUIDE VIEW -->
+
+      <!-- AI CALLING VIEW -->
+      <div id="ai-calling-view" style="display: none;">
+        <section style="margin-top: 18px;">
+          <div class="section-title">
+            <h3>📞 AI Calling Assistant</h3>
+            <span class="badge badge-blue" id="ai-calling-status-badge">Checking…</span>
+          </div>
+
+          <div class="card" style="margin-top: 12px; padding: 20px;">
+            <p class="minor" style="margin-top: 0;">
+              Request a call from the AI assistant. We will use your phone number from your profile.
+              If your phone is missing, update it in “My Profile”.
+            </p>
+
+            <div style="display: grid; gap: 12px; margin-top: 12px;">
+              <div>
+                <label for="ai-call-topic">Topic (optional)</label>
+                <input id="ai-call-topic" class="form-input" placeholder="e.g. Resume review, interview prep, job application help" />
+              </div>
+              <div>
+                <label for="ai-call-notes">Notes (optional)</label>
+                <textarea id="ai-call-notes" class="form-input" rows="4" placeholder="Tell the assistant what you need help with…"></textarea>
+              </div>
+
+              <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
+                <button class="btn btn-ghost" id="ai-call-refresh">Recheck status</button>
+                <button class="btn btn-primary" id="ai-call-request">📞 Request Call</button>
+              </div>
+
+              <div id="ai-call-result" class="minor" style="display:none;"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+      <!-- END AI CALLING VIEW -->
 
     </div>
   </main>
@@ -1006,9 +1043,11 @@
     const profileView = document.querySelector('#profile-view');
     const dashboardView = document.querySelector('#dashboard-view');
     const learningGuideView = document.querySelector('#learning-guide-view');
+    const aiCallingView = document.querySelector('#ai-calling-view');
     const navDashboard = document.querySelector('#nav-dashboard');
     const navProfile = document.querySelector('#nav-profile');
     const navLearningGuide = document.querySelector('#nav-learning-guide');
+    const navAiCalling = document.querySelector('#nav-ai-calling');
     const editProfileBtn = document.querySelector('#edit-profile-btn');
     const saveProfileBtn = document.querySelector('#save-profile-btn');
     const cancelEditBtn = document.querySelector('#cancel-edit-btn');
@@ -1025,9 +1064,11 @@
       dashboardView.style.display = 'block';
       profileView.style.display = 'none';
       learningGuideView.style.display = 'none';
+      aiCallingView.style.display = 'none';
       navDashboard.classList.add('active');
       navProfile.classList.remove('active');
       navLearningGuide.classList.remove('active');
+      navAiCalling.classList.remove('active');
     });
 
     navProfile.addEventListener('click', (e) => {
@@ -1035,9 +1076,11 @@
       dashboardView.style.display = 'none';
       profileView.style.display = 'block';
       learningGuideView.style.display = 'none';
+      aiCallingView.style.display = 'none';
       navDashboard.classList.remove('active');
       navProfile.classList.add('active');
       navLearningGuide.classList.remove('active');
+      navAiCalling.classList.remove('active');
       loadProfile();
     });
 
@@ -1046,10 +1089,87 @@
       dashboardView.style.display = 'none';
       profileView.style.display = 'none';
       learningGuideView.style.display = 'block';
+      aiCallingView.style.display = 'none';
       navDashboard.classList.remove('active');
       navProfile.classList.remove('active');
       navLearningGuide.classList.add('active');
+      navAiCalling.classList.remove('active');
       loadLearningGuide();
+    });
+
+    // AI Calling view
+    async function updateAiCallingStatus() {
+      const badge = document.getElementById('ai-calling-status-badge');
+      if (!badge) return;
+      badge.className = 'badge badge-blue';
+      badge.textContent = 'Checking…';
+      try {
+        const status = await manager.api('/ai-calling/health');
+        if (status.enabled && status.service_url_configured) {
+          badge.className = 'badge badge-green';
+          badge.textContent = 'Ready';
+        } else if (!status.enabled) {
+          badge.className = 'badge badge-amber';
+          badge.textContent = 'Disabled';
+        } else {
+          badge.className = 'badge badge-amber';
+          badge.textContent = 'Not configured';
+        }
+      } catch (err) {
+        badge.className = 'badge badge-amber';
+        badge.textContent = 'Unavailable';
+      }
+    }
+
+    function setAiCallResult(text, type = 'info') {
+      const el = document.getElementById('ai-call-result');
+      if (!el) return;
+      el.style.display = 'block';
+      el.style.padding = '10px 12px';
+      el.style.borderRadius = '10px';
+      el.style.border = type === 'error' ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(59, 130, 246, 0.25)';
+      el.style.background = type === 'error' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(59, 130, 246, 0.08)';
+      el.style.color = type === 'error' ? '#fecaca' : '#bfdbfe';
+      el.textContent = text;
+    }
+
+    navAiCalling.addEventListener('click', async (e) => {
+      e.preventDefault();
+      dashboardView.style.display = 'none';
+      profileView.style.display = 'none';
+      learningGuideView.style.display = 'none';
+      aiCallingView.style.display = 'block';
+      navDashboard.classList.remove('active');
+      navProfile.classList.remove('active');
+      navLearningGuide.classList.remove('active');
+      navAiCalling.classList.add('active');
+      await updateAiCallingStatus();
+    });
+
+    document.getElementById('ai-call-refresh')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      await updateAiCallingStatus();
+      manager.showToast('AI calling status refreshed', 'success');
+    });
+
+    document.getElementById('ai-call-request')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('ai-call-request');
+      const topic = (document.getElementById('ai-call-topic')?.value || '').trim();
+      const notes = (document.getElementById('ai-call-notes')?.value || '').trim();
+      try {
+        if (btn) btn.disabled = true;
+        setAiCallResult('Submitting call request…');
+        const res = await manager.api('/ai-calling/request', 'POST', { topic, notes });
+        manager.showToast('Call request submitted. You should receive a call shortly.', 'success');
+        setAiCallResult('Call request submitted successfully.', 'success');
+        console.log('[AI_CALLING] response:', res);
+      } catch (err) {
+        manager.showToast(err.message || 'Failed to request call', 'error');
+        setAiCallResult(err.message || 'Failed to request call', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
     });
 
     // Load profile data

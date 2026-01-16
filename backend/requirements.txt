@@ -8,6 +8,9 @@ python-dotenv==1.0.0
 Werkzeug==3.0.1
 cryptography==41.0.7
 gunicorn==21.2.0
+fastapi==0.110.0
+uvicorn==0.27.1
+starlette==0.36.3
 openpyxl==3.1.2
 PyPDF2==3.0.1
 python-docx==1.1.0
@@ -20,3 +23,11 @@ google-auth-oauthlib==1.2.0
 firebase-admin==6.4.0
 google-cloud-firestore==2.14.0
 google-cloud-storage==2.14.0
+numpy==1.26.4
+soundfile==0.12.1
+scipy==1.11.4
+openai==1.10.0
+whisper-openai==1.0.0
+edge-tts==6.1.10
+python-multipart==0.0.9
+twilio==9.4.6

@@ -1,0 +1,9 @@
+uvicorn server:app --host 0.0.0.0 --port 8000 in cmd
+
+ngrok http 8000 in new cmd
+
+python make_call.py in new cmd run 
+
+Al three will be run in new cmd
+ 
+ 
