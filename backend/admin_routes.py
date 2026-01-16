@@ -728,11 +728,6 @@ def get_placement_stats():
                     Student.branch == dept.name,
                     User.is_verified == True
                 ).scalar() or 0
-                    User, Student.user_id == User.id
-                ).filter(
-                    Student.branch == dept.name,
-                    User.is_verified == True
-                ).scalar() or 0
                 dept_placed = db.session.query(func.count(func.distinct(OfferLetter.student_id))).join(
                     Student, OfferLetter.student_id == Student.id
                 ).filter(
