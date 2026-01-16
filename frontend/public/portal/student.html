@@ -514,6 +514,7 @@
 
               <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
                 <button class="btn btn-ghost" id="ai-call-refresh">Recheck status</button>
+                <button class="btn btn-secondary" id="ai-call-configure">⚙️ Configure</button>
                 <button class="btn btn-primary" id="ai-call-request">📞 Request Call</button>
               </div>
 
@@ -521,6 +522,35 @@
             </div>
           </div>
         </section>
+
+        <!-- AI Calling Config Modal -->
+        <div id="ai-call-config-modal" style="display:none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.55); padding: 20px;">
+          <div class="card" style="max-width: 520px; margin: 7vh auto; padding: 18px; border: 1px solid rgba(255,255,255,0.10);">
+            <div style="display:flex; align-items:center; justify-content: space-between; gap: 12px;">
+              <h4 style="margin: 0;">⚙️ Call Configuration</h4>
+              <button class="btn btn-ghost" id="ai-call-config-close" aria-label="Close">✕</button>
+            </div>
+            <p class="minor" style="margin-top: 8px;">
+              Enter your name and mobile number. For best results, use international format like <strong>+91XXXXXXXXXX</strong>.
+            </p>
+
+            <div style="display:grid; gap: 12px; margin-top: 12px;">
+              <div>
+                <label for="ai-call-name">Name</label>
+                <input id="ai-call-name" class="form-input" placeholder="Your full name" />
+              </div>
+              <div>
+                <label for="ai-call-phone">Mobile No</label>
+                <input id="ai-call-phone" class="form-input" placeholder="e.g. +91XXXXXXXXXX" />
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content: flex-end; gap: 10px; margin-top: 16px;">
+              <button class="btn btn-ghost" id="ai-call-config-cancel">Cancel</button>
+              <button class="btn btn-primary" id="ai-call-config-save">Save</button>
+            </div>
+          </div>
+        </div>
       </div>
       <!-- END AI CALLING VIEW -->
 
@@ -1105,7 +1135,11 @@
       badge.textContent = 'Checking…';
       try {
         const status = await manager.api('/ai-calling/health');
-        if (status.enabled && status.service_url_configured) {
+        const configured = (typeof status.configured === 'boolean')
+          ? status.configured
+          : (status.enabled && (status.service_url_configured || status.self_hosted));
+
+        if (configured) {
           badge.className = 'badge badge-green';
           badge.textContent = 'Ready';
         } else if (!status.enabled) {
@@ -1120,6 +1154,80 @@
         badge.textContent = 'Unavailable';
       }
     }
+
+    // AI Calling config (name + phone)
+    function getAiCallConfig() {
+      try {
+        return JSON.parse(localStorage.getItem('ai_call_config') || 'null');
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function setAiCallConfig(cfg) {
+      try {
+        localStorage.setItem('ai_call_config', JSON.stringify(cfg || {}));
+      } catch (_) {}
+    }
+
+    function openAiCallConfigModal(prefill = {}) {
+      const modal = document.getElementById('ai-call-config-modal');
+      const nameInput = document.getElementById('ai-call-name');
+      const phoneInput = document.getElementById('ai-call-phone');
+      if (!modal || !nameInput || !phoneInput) return;
+
+      const saved = getAiCallConfig() || {};
+      nameInput.value = (prefill.name || saved.name || '').toString();
+      phoneInput.value = (prefill.phone || saved.phone || '').toString();
+      modal.style.display = 'block';
+    }
+
+    function closeAiCallConfigModal() {
+      const modal = document.getElementById('ai-call-config-modal');
+      if (modal) modal.style.display = 'none';
+    }
+
+    document.getElementById('ai-call-configure')?.addEventListener('click', async (e) => {
+      e.preventDefault();
+      if (!studentProfile) {
+        try { studentProfile = await manager.api('/student/profile'); } catch (_) {}
+      }
+      openAiCallConfigModal({
+        name: studentProfile?.full_name || '',
+        phone: studentProfile?.phone || ''
+      });
+    });
+
+    document.getElementById('ai-call-config-close')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeAiCallConfigModal();
+    });
+
+    document.getElementById('ai-call-config-cancel')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeAiCallConfigModal();
+    });
+
+    document.getElementById('ai-call-config-modal')?.addEventListener('click', (e) => {
+      if (e.target && e.target.id === 'ai-call-config-modal') closeAiCallConfigModal();
+    });
+
+    document.getElementById('ai-call-config-save')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      const name = (document.getElementById('ai-call-name')?.value || '').trim();
+      const phone = (document.getElementById('ai-call-phone')?.value || '').trim();
+      if (!name) {
+        manager.showToast('Please enter your name', 'error');
+        return;
+      }
+      if (!phone) {
+        manager.showToast('Please enter your mobile number', 'error');
+        return;
+      }
+      setAiCallConfig({ name, phone });
+      closeAiCallConfigModal();
+      manager.showToast('Call configuration saved', 'success');
+    });
 
     function setAiCallResult(text, type = 'info') {
       const el = document.getElementById('ai-call-result');
@@ -1160,7 +1268,27 @@
       try {
         if (btn) btn.disabled = true;
         setAiCallResult('Submitting call request…');
-        const res = await manager.api('/ai-calling/request', 'POST', { topic, notes });
+
+        // Ensure config exists; if not, prompt user.
+        let cfg = getAiCallConfig();
+        if (!cfg || !cfg.name || !cfg.phone) {
+          if (!studentProfile) {
+            try { studentProfile = await manager.api('/student/profile'); } catch (_) {}
+          }
+          openAiCallConfigModal({
+            name: studentProfile?.full_name || '',
+            phone: studentProfile?.phone || ''
+          });
+          setAiCallResult('Please fill the configuration (name + mobile) to continue.', 'error');
+          return;
+        }
+
+        const res = await manager.api('/ai-calling/request', 'POST', {
+          topic,
+          notes,
+          name: (cfg.name || '').trim(),
+          phone: (cfg.phone || '').trim(),
+        });
         manager.showToast('Call request submitted. You should receive a call shortly.', 'success');
         setAiCallResult('Call request submitted successfully.', 'success');
         console.log('[AI_CALLING] response:', res);

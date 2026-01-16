@@ -7,7 +7,7 @@ import httpx
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from models import User
+from models import User, db
 
 ai_calling_bp = Blueprint('ai_calling', __name__, url_prefix='/api/ai-calling')
 
@@ -26,6 +26,41 @@ def _truthy(value: str | None, default: bool = False) -> bool:
     return value.strip().lower() in ('1', 'true', 'yes', 'y', 'on')
 
 
+def _normalize_phone(phone: str | None) -> str:
+    """Normalize a phone number for Twilio.
+
+    - Strips spaces/dashes/parentheses
+    - If all digits and length==10, optionally prefixes AI_CALLING_DEFAULT_COUNTRY_CODE (e.g. +91)
+    """
+    raw = (phone or '').strip()
+    if not raw:
+        return ''
+
+    cleaned = ''.join(ch for ch in raw if ch.isdigit() or ch == '+')
+
+    # keep only the first '+' if any
+    if cleaned.count('+') > 1:
+        cleaned = '+' + cleaned.replace('+', '')
+
+    digits = ''.join(ch for ch in cleaned if ch.isdigit())
+    if cleaned.startswith('+'):
+        # E.164-ish; basic sanity
+        if 10 <= len(digits) <= 15:
+            return cleaned
+        return ''
+
+    default_cc = os.getenv('AI_CALLING_DEFAULT_COUNTRY_CODE', '').strip()
+    if default_cc and len(digits) == 10:
+        if not default_cc.startswith('+'):
+            default_cc = '+' + default_cc
+        return f'{default_cc}{digits}'
+
+    # fallback: digits only
+    if 10 <= len(digits) <= 15:
+        return digits
+    return ''
+
+
 @ai_calling_bp.route('/health', methods=['GET'])
 @jwt_required()
 def ai_calling_health():
@@ -34,12 +69,34 @@ def ai_calling_health():
     service_url = os.getenv('AI_CALLING_SERVICE_URL', '').strip()
     endpoint = os.getenv('AI_CALLING_ENDPOINT', '/call').strip() or '/call'
 
+    # When service_url is empty, the calling server is expected to be self-hosted
+    # in the same Railway backend (ASGI via uvicorn).
+    self_hosted = enabled and not service_url
+
+    missing = []
+    if enabled:
+        # For self-hosted mode, we require Twilio + AI keys.
+        if self_hosted:
+            for k in ('TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_FROM_NUMBER', 'CALLING_PUBLIC_URL'):
+                if not (os.getenv(k) or '').strip():
+                    missing.append(k)
+            # AI voice pipeline
+            if not (os.getenv('GROQ_API_KEY') or '').strip():
+                missing.append('GROQ_API_KEY')
+            if not (os.getenv('OPENAI_API_KEY') or '').strip():
+                missing.append('OPENAI_API_KEY')
+
+    configured = enabled and (bool(service_url) or self_hosted) and not missing
+
     return jsonify({
         'success': True,
         'enabled': enabled,
         'service_url_configured': bool(service_url),
+        'self_hosted': self_hosted,
+        'configured': configured,
         'endpoint': endpoint,
         'require_verified': _truthy(os.getenv('AI_CALLING_REQUIRE_VERIFIED'), default=True),
+        'missing': missing,
     }), 200
 
 
@@ -90,6 +147,31 @@ def request_ai_call():
         topic = (data.get('topic') or '').strip()
         notes = (data.get('notes') or '').strip()
 
+        # Optional overrides (useful when phone/name is missing in profile)
+        override_name = (data.get('name') or '').strip()
+        override_phone = _normalize_phone(data.get('phone'))
+
+        if override_name and not student.full_name:
+            try:
+                student.full_name = override_name
+                db_changed = True
+            except Exception:
+                db_changed = False
+
+        if override_phone and not phone:
+            try:
+                student.phone = override_phone
+                db_changed = True
+            except Exception:
+                db_changed = False
+
+        # Choose the phone used for the call.
+        phone_for_call = override_phone or _normalize_phone(phone) or phone
+        if not phone_for_call:
+            return jsonify({'success': False, 'error': 'Phone number missing/invalid. Enter a valid mobile number (prefer +<countrycode><number>).'}), 400
+
+        name_for_call = override_name or (student.full_name or '').strip()
+
         service_url = os.getenv('AI_CALLING_SERVICE_URL', '').strip().rstrip('/')
         if not service_url:
             # Default to same-origin when AI calling server is embedded in this backend.
@@ -105,8 +187,8 @@ def request_ai_call():
         timeout_s = float(os.getenv('AI_CALLING_TIMEOUT', '20'))
 
         payload = {
-            'phone': phone,
-            'name': student.full_name,
+            'phone': phone_for_call,
+            'name': name_for_call,
             'email': user.email,
             'topic': topic,
             'notes': notes,
