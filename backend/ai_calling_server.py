@@ -71,7 +71,7 @@ def _get_whisper_model():
             f"Original error: {e}"
         )
 
-    model_name = os.getenv("AI_CALLING_WHISPER_MODEL", "base").strip() or "base"
+    model_name = os.getenv("AI_CALLING_WHISPER_MODEL", "tiny").strip() or "tiny"
     _stt_model = whisper.load_model(model_name)
     return _stt_model
 
