@@ -1,14 +1,23 @@
 """Clear all students except demo account"""
 import os
 import pymysql
+from urllib.parse import urlparse
 
-# Connect to Railway MySQL database
+# Parse the public MySQL URL
+mysql_url = os.getenv('MYSQL_PUBLIC_URL') or os.getenv('MYSQL_URL')
+if not mysql_url:
+    print('ERROR: No MySQL URL found in environment')
+    exit(1)
+
+parsed = urlparse(mysql_url)
+
+# Connect to Railway MySQL database using public URL
 conn = pymysql.connect(
-    host=os.getenv('MYSQLHOST'),
-    user=os.getenv('MYSQLUSER'),
-    password=os.getenv('MYSQLPASSWORD'),
-    database=os.getenv('MYSQLDATABASE'),
-    port=int(os.getenv('MYSQLPORT', 3306))
+    host=parsed.hostname,
+    user=parsed.username,
+    password=parsed.password,
+    database=parsed.path.lstrip('/'),
+    port=parsed.port or 3306
 )
 
 cur = conn.cursor()
