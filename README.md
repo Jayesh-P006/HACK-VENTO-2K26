@@ -27,7 +27,8 @@ A comprehensive university placement portal with modern UI/UX, built with React,
 - **Frontend (Landing + Portal)**: React + Vite + Tailwind (in `frontend/`)
 - **Portal UI pages**: Static HTML/CSS/JS served from `frontend/public/portal/`
 - **Backend**: Flask (Python)
-- **Database**: MySQL
+- **Database**: Firebase Firestore (NoSQL Cloud Database)
+- **Storage**: Firebase Cloud Storage (for resumes and documents)
 - **Authentication**: JWT (JSON Web Tokens)
 
 ## Setup Instructions
@@ -35,9 +36,38 @@ A comprehensive university placement portal with modern UI/UX, built with React,
 ### Prerequisites
 - Python 3.8+
 - Node.js 16+
-- MySQL 8.0+
+- Firebase Project (see [FIREBASE_MIGRATION_GUIDE.md](FIREBASE_MIGRATION_GUIDE.md))
 
-### Database Setup
+### Firebase Setup
+
+**Important**: This app now uses Firebase Firestore instead of MySQL.
+
+1. **Create Firebase Project**:
+   - Go to [Firebase Console](https://console.firebase.google.com/)
+   - Create new project
+   - Enable Firestore Database
+   - Enable Firebase Storage
+
+2. **Download Service Account**:
+   - Project Settings → Service Accounts → Generate New Private Key
+   - Save as `backend/service-account.json` (**Never commit this!**)
+
+3. **Configure Environment**:
+```bash
+cd backend
+cp .env.example .env
+# Edit .env and add:
+FIREBASE_SERVICE_ACCOUNT=service-account.json
+FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+```
+
+See detailed setup in **[FIREBASE_MIGRATION_GUIDE.md](FIREBASE_MIGRATION_GUIDE.md)**
+
+### Database Setup (Optional - For Migration)
+
+### Database Setup (Optional - For Migration)
+
+If you have existing MySQL data to migrate:
 
 1. Create MySQL database:
 ```sql
@@ -48,6 +78,14 @@ CREATE DATABASE placement_portal;
 ```bash
 mysql -u root -p placement_portal < database/schema.sql
 ```
+
+3. Run migration script:
+```bash
+cd backend
+python migrate_to_firebase.py
+```
+
+See **[FIREBASE_MIGRATION_GUIDE.md](FIREBASE_MIGRATION_GUIDE.md)** for complete migration instructions.
 
 ### Backend Setup
 

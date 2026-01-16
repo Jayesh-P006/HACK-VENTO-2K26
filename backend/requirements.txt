@@ -2,7 +2,6 @@ Flask==3.0.0
 Flask-SQLAlchemy==3.1.1
 Flask-CORS==4.0.0
 Flask-JWT-Extended==4.6.0
-Flask-Mail==0.9.1
 PyMySQL==1.1.0
 python-dotenv==1.0.0
 Werkzeug==3.0.1
@@ -16,4 +15,6 @@ google-api-python-client==2.149.0
 google-auth==2.33.0
 google-auth-httplib2==0.2.0
 google-auth-oauthlib==1.2.0
-gunicorn==21.2.0
+firebase-admin==6.4.0
+google-cloud-firestore==2.14.0
+google-cloud-storage==2.14.0

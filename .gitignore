@@ -25,6 +25,10 @@ build/
 uploads/
 backend/uploads/
 
+# Firebase service account (NEVER commit this!)
+service-account.json
+backend/service-account.json
+
 
 # IDE
 .vscode/
@@ -60,4 +64,3 @@ build/
 # OS
 .DS_Store
 Thumbs.db
-.vercel

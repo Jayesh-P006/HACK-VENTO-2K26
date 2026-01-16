@@ -367,10 +367,16 @@ def get_departments():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/auth/register', methods=['POST'])
+@app.route('/api/auth/register', methods=['POST', 'OPTIONS'])
 def register():
     """Register a new user (Student, Company, or Admin)"""
     try:
+        # Explicitly handle CORS preflight.
+        # Flask-CORS often handles this automatically, but some gateways/browsers
+        # behave better with a fast 204 response.
+        if request.method == 'OPTIONS':
+            return ('', 204)
+
         print(f'\n[REGISTER] ========== NEW REGISTRATION REQUEST ==========')
         print(f'[REGISTER] Request method: {request.method}')
         print(f'[REGISTER] Content-Type: {request.content_type}')

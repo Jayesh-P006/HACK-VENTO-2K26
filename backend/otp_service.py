@@ -1,12 +1,12 @@
-"""
-OTP and Email Verification Module
-Handles OTP generation, storage, sending, and verification
+"""OTP and Email Verification Module.
+
+Important: Email sending should never block HTTP requests.
+This module uses the async sender in `email_service.py`.
 """
 
 import random
 import string
 from datetime import datetime, timedelta
-from flask_mail import Message
 from flask import current_app
 
 def generate_otp(length=6):
@@ -14,10 +14,24 @@ def generate_otp(length=6):
     return ''.join(random.choices(string.digits, k=length))
 
 
+def _is_mail_configured():
+    """Return True when Flask-Mail credentials are configured.
+
+    If not configured, we should fail fast (no blocking network calls).
+    """
+    try:
+        cfg = current_app.config
+        return bool(cfg.get('MAIL_SERVER') and cfg.get('MAIL_PORT') and cfg.get('MAIL_USERNAME') and cfg.get('MAIL_PASSWORD'))
+    except Exception:
+        return False
+
+
 def send_otp_email(email, full_name, otp):
     """Send OTP verification email to user"""
     try:
-        from email_service import mail
+        if not _is_mail_configured():
+            print('[OTP] Email not configured (MAIL_USERNAME/MAIL_PASSWORD missing); skipping send_otp_email')
+            return False
         
         subject = f'Silent Syntax Portal - Email Verification Code: {otp}'
         
@@ -97,15 +111,10 @@ If you didn't request this verification, please ignore this email.
 © 2026 Silent Syntax Portal
         """
         
-        msg = Message(
-            subject=subject,
-            recipients=[email],
-            html=html_body,
-            body=text_body
-        )
-        
-        mail.send(msg)
-        print(f'[OTP] Email sent to {email} with OTP: {otp}')
+        # Send asynchronously to avoid request timeouts (e.g., Railway/Vercel gateways)
+        from email_service import send_email
+        send_email(subject=subject, recipients=email, html_body=html_body, text_body=text_body)
+        print(f'[OTP] OTP email queued for {email}')
         return True
         
     except Exception as e:
@@ -126,7 +135,9 @@ def is_otp_valid(otp_record):
 def send_approval_pending_email(email, full_name, role_type):
     """Send email notifying user that email is verified, pending admin approval"""
     try:
-        from email_service import mail
+        if not _is_mail_configured():
+            print('[OTP] Email not configured (MAIL_USERNAME/MAIL_PASSWORD missing); skipping send_approval_pending_email')
+            return False
         
         role_text = "student" if role_type == "student" else "admin" if role_type == "admin" else "company"
         
@@ -215,15 +226,9 @@ If you have any questions, please contact our support team.
 © 2026 Silent Syntax Portal
         """
         
-        msg = Message(
-            subject=subject,
-            recipients=[email],
-            html=html_body,
-            body=text_body
-        )
-        
-        mail.send(msg)
-        print(f'[OTP] Approval pending email sent to {email}')
+        from email_service import send_email
+        send_email(subject=subject, recipients=email, html_body=html_body, text_body=text_body)
+        print(f'[OTP] Approval pending email queued for {email}')
         return True
         
     except Exception as e:

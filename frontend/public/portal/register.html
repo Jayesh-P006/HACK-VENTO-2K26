@@ -575,6 +575,17 @@
         }
       }
 
+      function setSubmitButtonState({ loading = false, success = false, label = 'Create Account' } = {}) {
+        submitBtn.disabled = !!loading;
+        submitBtn.classList.toggle('success', !!success);
+        const labelSpan = submitBtn.querySelector('.register-btn-text');
+        if (labelSpan) {
+          labelSpan.textContent = label;
+        } else {
+          submitBtn.textContent = label;
+        }
+      }
+
       if (form) {
       console.log('[REGISTER] 🎯 Attaching form submit event listener...');
       form.addEventListener('submit', async (e) => {
@@ -680,12 +691,13 @@
             payload.verification_key = formData.get('admin_verification_key');
           }
 
-          submitBtn.disabled = true;
-          submitBtn.textContent = 'Creating account...';
+          setSubmitButtonState({ loading: true, success: false, label: 'Creating account...' });
 
           console.log('[REGISTER] Sending registration payload:', JSON.stringify(payload, null, 2));
           console.log('[REGISTER] API endpoint:', `${API_BASE}/auth/register`);
           
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 20000);
           const response = await fetch(`${API_BASE}/auth/register`, {
             method: 'POST',
             headers: { 
@@ -693,7 +705,9 @@
               'Accept': 'application/json'
             },
             body: JSON.stringify(payload),
+            signal: controller.signal,
           });
+          clearTimeout(timeoutId);
 
           console.log('[REGISTER] Response status:', response.status);
           console.log('[REGISTER] Response headers:', response.headers);
@@ -716,21 +730,29 @@
           console.log('[REGISTER] Registration successful. Response:', responseData);
           
           // Animate success state
-          submitBtn.classList.add('success');
-          submitBtn.textContent = '✓ Account Created!';
+          setSubmitButtonState({ loading: true, success: true, label: '✓ Account Created!' });
           createConfetti();
           
-          // Check if response includes email verification step
-          if (responseData.next_step === 'otp_verification') {
+          // Redirect to OTP verification page on successful registration.
+          // Even if OTP email couldn't be sent, the page supports resend.
+          if (responseData.next_step === 'otp_verification' || responseData.user || responseData.email) {
             console.log('[REGISTER] Redirecting to OTP verification page...');
-            showToast('Account created! Check your email for verification code...', 'success');
+            const otpMsg = responseData.otp_email_sent
+              ? 'Account created! Check your email for verification code...'
+              : 'Account created! OTP email may be delayed; use Resend OTP if needed.';
+            showToast(otpMsg, 'success');
             
             // Redirect to OTP verification page with email and role as params
-            const email = encodeURIComponent(responseData.email);
+            const emailValue = responseData.email || payload.email;
+            const email = encodeURIComponent(emailValue);
             const role = responseData.role_type || 'student';
+            try {
+              sessionStorage.setItem('pending_verification_email', emailValue || '');
+              sessionStorage.setItem('pending_verification_role', role);
+            } catch (_) {}
             setTimeout(() => {
               window.location.href = `verify-email-otp.html?email=${email}&role=${role}`;
-            }, 2500);
+            }, 700);
           } else {
             // Fallback to login
             showToast('Account created successfully! Redirecting to login...', 'success');
@@ -742,13 +764,14 @@
             message: err.message,
             stack: err.stack
           });
-          if (String(err.message || '').toLowerCase().includes('failed to fetch')) {
+          if (err && err.name === 'AbortError') {
+            showToast('Registration request timed out. Please try again.', 'error');
+          } else if (String(err.message || '').toLowerCase().includes('failed to fetch')) {
             showToast(`Backend not reachable. Check API_BASE: ${API_BASE}`, 'error');
           } else {
             showToast(err.message || 'Registration failed. Please check your connection and try again.', 'error');
           }
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Create Account';
+          setSubmitButtonState({ loading: false, success: false, label: 'Create Account' });
         }
       });
       } else {
