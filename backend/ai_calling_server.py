@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import io
 import json
 import os
 import tempfile
+import wave
 from concurrent.futures import ThreadPoolExecutor
 
 import audioop
@@ -26,7 +28,8 @@ from fastapi.responses import PlainTextResponse
 from openai import OpenAI
 from twilio.rest import Client
 
-# NOTE: whisper is heavy; we load lazily to reduce cold-start time.
+# NOTE: local Whisper requires PyTorch and balloons the container image.
+# For Railway free tier image limits, we use remote STT (OpenAI Whisper API).
 
 
 SAMPLE_RATE = 8000
@@ -35,8 +38,8 @@ SILENCE_THRESHOLD = 350
 BARGE_IN_THRESHOLD = 900
 
 _executor = ThreadPoolExecutor(max_workers=3)
-_stt_model = None
 _groq_client = None
+_stt_client = None
 
 
 def _truthy(value: str | None, default: bool = False) -> bool:
@@ -58,22 +61,26 @@ def _get_groq_client() -> OpenAI:
     return _groq_client
 
 
-def _get_whisper_model():
-    global _stt_model
-    if _stt_model is not None:
-        return _stt_model
+def _get_stt_client() -> OpenAI:
+    """Create a client for remote speech-to-text.
 
-    try:
-        import whisper  # provided by whisper-openai
-    except Exception as e:
-        raise RuntimeError(
-            "Whisper STT is not available. Install 'whisper-openai' and its dependencies. "
-            f"Original error: {e}"
-        )
+    Uses OpenAI-compatible Whisper endpoint.
+    Required env:
+      - OPENAI_API_KEY
+    Optional:
+      - OPENAI_BASE_URL
+    """
+    global _stt_client
+    if _stt_client is not None:
+        return _stt_client
 
-    model_name = os.getenv("AI_CALLING_WHISPER_MODEL", "tiny").strip() or "tiny"
-    _stt_model = whisper.load_model(model_name)
-    return _stt_model
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is required for remote STT")
+
+    base_url = os.getenv("OPENAI_BASE_URL", "").strip() or None
+    _stt_client = OpenAI(api_key=api_key, base_url=base_url)
+    return _stt_client
 
 
 def fetch_existing_readiness() -> dict:
@@ -245,20 +252,32 @@ async def tts_to_ulaw(text: str) -> bytes:
 
 
 def transcribe(audio: np.ndarray) -> str:
-    model = _get_whisper_model()
+    """Remote STT using OpenAI Whisper API.
 
-    audio_f32 = np.repeat(audio, 2).astype(np.float32) / 32768.0
+    This avoids bundling local Whisper/PyTorch which makes Railway images huge.
+    """
+    client = _get_stt_client()
+    model = os.getenv("AI_CALLING_STT_MODEL", "whisper-1").strip() or "whisper-1"
 
-    result = model.transcribe(
-        audio_f32,
-        language=os.getenv("AI_CALLING_STT_LANGUAGE", "en"),
-        fp16=False,
-        condition_on_previous_text=False,
-        temperature=0.0,
-        no_speech_threshold=0.5,
-        compression_ratio_threshold=2.0,
-    )
-    return (result.get("text") or "").strip()
+    # Convert raw PCM int16 @ 8kHz mono to a WAV in memory.
+    wav_buf = io.BytesIO()
+    with wave.open(wav_buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(SAMPLE_RATE)
+        wf.writeframes(audio.tobytes())
+    wav_buf.seek(0)
+
+    try:
+        # openai-python accepts file-like objects.
+        resp = client.audio.transcriptions.create(
+            model=model,
+            file=("audio.wav", wav_buf, "audio/wav"),
+            language=os.getenv("AI_CALLING_STT_LANGUAGE", "en"),
+        )
+        return (getattr(resp, "text", None) or "").strip()
+    except Exception:
+        return ""
 
 
 def _public_base_url_from_request(request: Request) -> str:
