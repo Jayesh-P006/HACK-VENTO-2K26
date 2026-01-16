@@ -1,5 +1,7 @@
 import os
 
+print("[asgi] booting asgi_app...")
+
 from fastapi import FastAPI
 from starlette.middleware.wsgi import WSGIMiddleware
 
@@ -22,7 +24,11 @@ if _truthy(os.getenv("AI_CALLING_ENABLED"), default=False):
     from ai_calling_server import register_ai_calling_routes
 
     register_ai_calling_routes(app)
+    print("[asgi] AI calling routes registered")
+else:
+    print("[asgi] AI calling disabled")
 
 # Mount the existing Flask app last so it acts as a fallback for all other routes
 # (e.g. /api/*, /portal/*, etc.).
 app.mount("/", WSGIMiddleware(flask_app))
+print("[asgi] mounted Flask app")
