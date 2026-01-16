@@ -95,29 +95,57 @@ def fetch_existing_readiness() -> dict:
     }
 
 
-def is_placement_query(text: str) -> bool:
+def is_career_query(text: str) -> bool:
+    """Heuristic filter for career/placement/internship-related queries."""
     keywords = [
-        "ready",
-        "readiness",
-        "score",
         "placement",
-        "interview",
-        "skill",
-        "gap",
-        "strength",
-        "weak",
-        "improve",
-        "prepare",
-        "dsa",
-        "system design",
-        "coding",
-        "resume",
-        "job",
-        "career",
-        "company",
-        "hiring",
+        "placements",
+        "intern",
         "internship",
+        "job",
+        "off-campus",
+        "on-campus",
+        "campus",
+        "interview",
+        "resume",
+        "cv",
+        "ats",
+        "portfolio",
+        "project",
+        "roadmap",
+        "plan",
+        "timeline",
+        "week",
+        "month",
+        "dsa",
+        "leetcode",
+        "system design",
+        "os",
+        "dbms",
+        "cn",
+        "oops",
+        "sql",
+        "python",
+        "java",
+        "javascript",
+        "react",
+        "node",
+        "backend",
+        "frontend",
+        "full stack",
+        "data science",
+        "ml",
+        "ai",
+        "cloud",
+        "devops",
+        "behavioural",
+        "hr round",
+        "salary",
+        "ctc",
+        "offer",
         "apply",
+        "referral",
+        "linkedin",
     ]
     t = (text or "").lower()
     return any(kw in t for kw in keywords)
@@ -166,20 +194,20 @@ def groq_reply(user_text: str, readiness: dict | None = None) -> str:
             "Best of luck with your placements. Goodbye!"
         )
 
-    if not is_placement_query(user_text):
+    if not is_career_query(user_text):
         return (
-            "I specialize in placement readiness guidance. "
-            "Ask me about your readiness score, skill gaps, strengths, or improvement strategies."
+            "I can help with placements and internships: resume/ATS, DSA, projects, interview prep, and roadmaps. "
+            "Ask what role you're targeting and your current level, and I’ll give a step-by-step plan."
         )
 
     system_prompt = (
-        "You are Silent Syntax's placement readiness AI assistant on a phone call.\n"
+        "You are Silent Syntax's placement + internship guidance assistant on a phone call.\n"
         "Rules:\n"
-        "1. Answer in 2 sentences maximum\n"
-        "2. Be direct, clear, helpful\n"
-        "3. Only discuss placement readiness\n"
-        "4. Never guarantee placement\n"
-        "5. NO follow-up questions\n"
+        "1. Be concise but useful: 4-7 short sentences max\n"
+        "2. Use a structured format when helpful (numbered steps / mini-roadmap)\n"
+        "3. Focus on actionable placement/internship advice (skills, projects, resume, interview strategy)\n"
+        "4. If the user asks for a roadmap, give a week-by-week or milestone plan\n"
+        "5. Never guarantee placement or internship\n"
     )
 
     if readiness:
@@ -198,14 +226,15 @@ def groq_reply(user_text: str, readiness: dict | None = None) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_text},
         ],
-        max_tokens=80,
-        temperature=0.4,
+        max_tokens=220,
+        temperature=0.35,
     )
 
     reply = (response.choices[0].message.content or "").strip()
-    for phrase in ["How can I", "What else", "Anything more", "Is there", "Let me know"]:
+    # Avoid overly chatty endings but don't delete useful content.
+    for phrase in ["Let me know if", "If you want,", "I can also", "Feel free to"]:
         if phrase in reply:
-            reply = reply.split(phrase)[0].strip().rstrip(",") + "."
+            reply = reply.split(phrase)[0].strip().rstrip(",")
     return reply
 
 
@@ -558,7 +587,7 @@ def register_ai_calling_routes(app: FastAPI) -> None:
                                 await asyncio.sleep(2)
                                 break
 
-                            readiness = fetch_existing_readiness() if is_placement_query(transcript) else None
+                            readiness = fetch_existing_readiness() if is_career_query(transcript) else None
                             try:
                                 ai_response = groq_reply(transcript, readiness)
                             except Exception as e:
