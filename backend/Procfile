@@ -1,1 +1,1 @@
-web: uvicorn asgi_app:app --host 0.0.0.0 --port $PORT
+web: sh -c 'if [ -d backend ]; then cd backend; fi; uvicorn asgi_app:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips=* --log-level info'
