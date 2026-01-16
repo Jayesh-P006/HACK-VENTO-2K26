@@ -19,12 +19,13 @@ import os
 import tempfile
 import wave
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlsplit
 
 import audioop
 import numpy as np
 import soundfile as sf
 from fastapi import FastAPI, HTTPException, Request, WebSocket
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import Response
 from openai import OpenAI
 from twilio.rest import Client
 
@@ -281,38 +282,72 @@ def transcribe(audio: np.ndarray) -> str:
 
 
 def _public_base_url_from_request(request: Request) -> str:
-    configured = os.getenv("CALLING_PUBLIC_URL", "").strip().rstrip("/")
+    configured = os.getenv("CALLING_PUBLIC_URL", "").strip()
     if configured:
-        return configured
+        return _canonical_public_url(configured)
 
     # Fallback: infer from forwarded headers
     scheme = request.headers.get("x-forwarded-proto") or "https"
     host = request.headers.get("x-forwarded-host") or request.headers.get("host")
     if not host:
         return ""
-    return f"{scheme}://{host}".rstrip("/")
+    return _canonical_public_url(f"{scheme}://{host}")
+
+
+def _canonical_public_url(raw_url: str) -> str:
+    """Normalize a public URL to just scheme://host.
+
+    This prevents common misconfiguration like setting CALLING_PUBLIC_URL to
+    `https://<host>/api` which would break `/answer` and `wss://.../media`.
+    """
+    raw = (raw_url or "").strip()
+    if not raw:
+        return ""
+
+    # Allow passing host without scheme.
+    if "://" not in raw:
+        raw = f"https://{raw}"
+
+    parts = urlsplit(raw)
+    if not parts.netloc:
+        return ""
+
+    scheme = (parts.scheme or "https").lower()
+    if scheme not in ("http", "https"):
+        scheme = "https"
+
+    return f"{scheme}://{parts.netloc}".rstrip("/")
+
+
+def _ws_url_from_public_url(public_url: str) -> str:
+    parts = urlsplit(public_url)
+    if not parts.netloc:
+        return ""
+    ws_scheme = "wss" if parts.scheme.lower() == "https" else "ws"
+    return f"{ws_scheme}://{parts.netloc}/media"
 
 
 def register_ai_calling_routes(app: FastAPI) -> None:
-    @app.post("/answer")
+    @app.api_route("/answer", methods=["GET", "POST"])
     async def answer(request: Request):
         public_url = _public_base_url_from_request(request)
         if not public_url:
             raise HTTPException(status_code=500, detail="Cannot determine public URL for Twilio")
 
-        ws_url = public_url.replace("https://", "wss://").replace("http://", "ws://") + "/media"
+        ws_url = _ws_url_from_public_url(public_url)
+        if not ws_url:
+            raise HTTPException(status_code=500, detail="Cannot determine WebSocket URL for Twilio")
 
-        return PlainTextResponse(
-            f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+        twiml = f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <Response>
-    <Say voice=\"alice\">Hello! Connecting you to Silent Syntax placement assistant.</Say>
-    <Connect>
-        <Stream url=\"{ws_url}\" />
-    </Connect>
-    <Pause length=\"60\"/>
-</Response>""",
-            media_type="application/xml",
-        )
+  <Say voice=\"alice\">Hello! Connecting you to Silent Syntax placement assistant.</Say>
+  <Connect>
+    <Stream url=\"{ws_url}\" />
+  </Connect>
+</Response>"""
+
+        # Twilio reliably parses `text/xml`.
+        return Response(content=twiml, media_type="text/xml")
 
     @app.post("/call")
     async def trigger_call(request: Request):
@@ -324,7 +359,9 @@ def register_ai_calling_routes(app: FastAPI) -> None:
         account_sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
         auth_token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
         from_number = os.getenv("TWILIO_FROM_NUMBER", "").strip()
-        public_url = (os.getenv("CALLING_PUBLIC_URL", "").strip() or _public_base_url_from_request(request)).rstrip("/")
+        public_url = _canonical_public_url(
+            os.getenv("CALLING_PUBLIC_URL", "").strip() or _public_base_url_from_request(request)
+        ).rstrip("/")
         webhook_path = (os.getenv("TWILIO_WEBHOOK_PATH", "/answer").strip() or "/answer")
         if not webhook_path.startswith("/"):
             webhook_path = "/" + webhook_path
@@ -350,6 +387,9 @@ def register_ai_calling_routes(app: FastAPI) -> None:
                 to=to_phone,
                 from_=from_number,
                 url=webhook_url,
+                status_callback=f"{public_url}/twilio/status",
+                status_callback_method="POST",
+                status_callback_event=["initiated", "ringing", "answered", "completed"],
             )
             return {
                 "success": True,
@@ -361,6 +401,21 @@ def register_ai_calling_routes(app: FastAPI) -> None:
             }
         except Exception as e:
             raise HTTPException(status_code=502, detail=f"Twilio call failed: {str(e)}")
+
+    @app.post("/twilio/status")
+    async def twilio_status(request: Request):
+        # Twilio sends application/x-www-form-urlencoded
+        try:
+            form = await request.form()
+            payload = dict(form)
+        except Exception:
+            try:
+                payload = await request.json()
+            except Exception:
+                payload = {"raw": (await request.body()).decode("utf-8", errors="ignore")}
+
+        print(f"[twilio-status] {payload}")
+        return {"success": True}
 
     @app.websocket("/media")
     async def media(ws: WebSocket):
@@ -381,46 +436,55 @@ def register_ai_calling_routes(app: FastAPI) -> None:
                 frame = await send_queue.get()
                 if frame is None:
                     return
-                await ws.send_json(
-                    {
-                        "event": "media",
-                        "streamSid": stream_sid,
-                        "media": {"payload": base64.b64encode(frame).decode()},
-                    }
-                )
-                await asyncio.sleep(0.02)
+                try:
+                    await ws.send_json(
+                        {
+                            "event": "media",
+                            "streamSid": stream_sid,
+                            "media": {"payload": base64.b64encode(frame).decode()},
+                        }
+                    )
+                    await asyncio.sleep(0.02)
+                except Exception:
+                    return
 
         sender_task = asyncio.create_task(sender())
 
         async def speak(text: str):
             nonlocal speaking
             speaking = True
-            ulaw = await tts_to_ulaw(text)
-            for i in range(0, len(ulaw), FRAME_SIZE):
-                if not speaking:
-                    break
-                await send_queue.put(ulaw[i : i + FRAME_SIZE])
-            speaking = False
+            try:
+                ulaw = await tts_to_ulaw(text)
+                for i in range(0, len(ulaw), FRAME_SIZE):
+                    if not speaking:
+                        break
+                    await send_queue.put(ulaw[i : i + FRAME_SIZE])
+            except Exception as e:
+                # Keep the call alive even if TTS fails.
+                print(f"[ai-calling] TTS error: {e}")
+            finally:
+                speaking = False
 
         try:
             async for msg in ws.iter_text():
-                data = json.loads(msg)
+                try:
+                    data = json.loads(msg)
+                except Exception:
+                    continue
+
                 event = data.get("event")
 
                 if event == "start":
                     stream_sid = data["start"]["streamSid"]
-                    if not greeting_sent:
-                        greeting = (
-                            "Hello! I'm your Silent Syntax placement readiness assistant. "
-                            "I can help you understand your readiness score, identify skill gaps, "
-                            "highlight your strengths, and suggest improvement strategies. "
-                            "What would you like to know?"
-                        )
-                        await speak(greeting)
-                        greeting_sent = True
+                    # We already greet via TwiML <Say> in /answer.
+                    # Avoid heavy TTS work on call start to reduce failure modes.
+                    greeting_sent = True
 
                 elif event == "media":
-                    pcm = audioop.ulaw2lin(base64.b64decode(data["media"]["payload"]), 2)
+                    try:
+                        pcm = audioop.ulaw2lin(base64.b64decode(data["media"]["payload"]), 2)
+                    except Exception:
+                        continue
                     chunk = np.frombuffer(pcm, dtype=np.int16)
 
                     if speaking and detect_barge_in(chunk):
@@ -453,22 +517,36 @@ def register_ai_calling_routes(app: FastAPI) -> None:
                             is_processing = False
                             continue
 
-                        transcript = await asyncio.get_event_loop().run_in_executor(
-                            _executor,
-                            transcribe,
-                            audio,
-                        )
+                        try:
+                            transcript = await asyncio.get_event_loop().run_in_executor(
+                                _executor,
+                                transcribe,
+                                audio,
+                            )
+                        except Exception as e:
+                            print(f"[ai-calling] STT error: {e}")
+                            transcript = ""
 
                         if transcript and len(transcript) > 1:
                             if is_goodbye(transcript):
                                 readiness = fetch_existing_readiness()
-                                goodbye_msg = groq_reply(transcript, readiness)
+                                try:
+                                    goodbye_msg = groq_reply(transcript, readiness)
+                                except Exception as e:
+                                    print(f"[ai-calling] Groq error: {e}")
+                                    goodbye_msg = "Thank you for calling Silent Syntax. Goodbye."
+
                                 await speak(goodbye_msg)
                                 await asyncio.sleep(2)
                                 break
 
                             readiness = fetch_existing_readiness() if is_placement_query(transcript) else None
-                            ai_response = groq_reply(transcript, readiness)
+                            try:
+                                ai_response = groq_reply(transcript, readiness)
+                            except Exception as e:
+                                print(f"[ai-calling] Groq error: {e}")
+                                ai_response = "I'm having trouble reaching the assistant right now. Please try again soon."
+
                             await speak(ai_response)
 
                         is_processing = False
@@ -476,7 +554,20 @@ def register_ai_calling_routes(app: FastAPI) -> None:
                 elif event == "stop":
                     break
 
+                else:
+                    # Ignore other Twilio events like "connected", "mark", etc.
+                    continue
+
         finally:
-            await send_queue.put(None)
-            await sender_task
-            await ws.close()
+            try:
+                await send_queue.put(None)
+            except Exception:
+                pass
+            try:
+                await sender_task
+            except Exception:
+                pass
+            try:
+                await ws.close()
+            except Exception:
+                pass
