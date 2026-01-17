@@ -38,6 +38,10 @@ FRAME_SIZE = 160  # 20ms μ-law frame
 SILENCE_THRESHOLD = 350
 BARGE_IN_THRESHOLD = 900
 
+# End-of-utterance tuning (20ms frames): silence_chunks=20 -> ~0.4s
+DEFAULT_SPEECH_CHUNKS_MIN = 8
+DEFAULT_SILENCE_CHUNKS_END = 20
+
 _executor = ThreadPoolExecutor(max_workers=3)
 _groq_client = None
 _stt_client = None
@@ -250,6 +254,17 @@ def detect_barge_in(chunk: np.ndarray, threshold: int = BARGE_IN_THRESHOLD) -> b
     return float(np.sqrt(np.mean(chunk.astype(np.float32) ** 2))) > threshold
 
 
+def _tone_ulaw(duration_ms: int = 200, freq_hz: int = 880) -> bytes:
+    """Generate a short tone as μ-law @ 8kHz for a simple audible signal."""
+    duration_ms = max(50, min(int(duration_ms), 1000))
+    freq_hz = max(200, min(int(freq_hz), 2000))
+    samples = int(SAMPLE_RATE * (duration_ms / 1000.0))
+    t = np.arange(samples, dtype=np.float32) / float(SAMPLE_RATE)
+    wave_f = 0.2 * np.sin(2.0 * np.pi * float(freq_hz) * t)
+    pcm = (wave_f * 32767.0).astype(np.int16).tobytes()
+    return audioop.lin2ulaw(pcm, 2)
+
+
 async def tts_to_ulaw(text: str) -> bytes:
     try:
         import edge_tts
@@ -371,11 +386,11 @@ def register_ai_calling_routes(app: FastAPI) -> None:
 
         twiml = f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <Response>
-  <Say voice=\"alice\">Hello! Connecting you to Silent Syntax placement assistant.</Say>
-  <Connect>
-    <Stream url=\"{ws_url}\" statusCallback=\"{stream_status_url}\" statusCallbackMethod=\"POST\" statusCallbackEvent=\"start end\" />
-  </Connect>
-  <Pause length=\"600\" />
+    <Say voice=\"alice\">Welcome to the portal of Silent Syntax. You can ask me about placements, internships, resumes, projects, and roadmaps. Please speak after the beep.</Say>
+    <Connect>
+        <Stream url=\"{ws_url}\" track=\"inbound_track\" statusCallback=\"{stream_status_url}\" statusCallbackMethod=\"POST\" statusCallbackEvent=\"start end\" />
+    </Connect>
+    <Pause length=\"600\" />
 </Response>"""
 
         # Twilio reliably parses `text/xml`.
@@ -523,9 +538,18 @@ def register_ai_calling_routes(app: FastAPI) -> None:
 
                 if event == "start":
                     stream_sid = data["start"]["streamSid"]
-                    # We already greet via TwiML <Say> in /answer.
-                    # Avoid heavy TTS work on call start to reduce failure modes.
-                    greeting_sent = True
+                    if not greeting_sent:
+                        # Give an audible cue + short prompt so the user knows we are listening.
+                        try:
+                            await send_queue.put(_tone_ulaw())
+                        except Exception:
+                            pass
+
+                        if _truthy(os.getenv("AI_CALLING_SEND_GREETING_ON_START"), default=True):
+                            await speak(
+                                "Hi. Ask your placement or internship question now, and I will answer with a short roadmap."  # noqa: E501
+                            )
+                        greeting_sent = True
 
                 elif event == "media":
                     try:
@@ -552,7 +576,14 @@ def register_ai_calling_routes(app: FastAPI) -> None:
                         speech_chunks += 1
                         silence_chunks = 0
 
-                    if speech_chunks > 10 and silence_chunks >= 35:
+                    speech_min = int(os.getenv("AI_CALLING_SPEECH_CHUNKS_MIN", str(DEFAULT_SPEECH_CHUNKS_MIN)))
+                    silence_end = int(os.getenv("AI_CALLING_SILENCE_CHUNKS_END", str(DEFAULT_SILENCE_CHUNKS_END)))
+
+                    # Also process if the buffer grows too large (~8s) to avoid getting stuck on noisy lines.
+                    buffered_samples = sum(int(a.size) for a in audio_buf)
+                    max_buffer_samples = int(SAMPLE_RATE * float(os.getenv("AI_CALLING_MAX_BUFFER_S", "8")))
+
+                    if (speech_chunks >= speech_min and silence_chunks >= silence_end) or (buffered_samples >= max_buffer_samples):
                         is_processing = True
 
                         audio = np.concatenate(audio_buf)
