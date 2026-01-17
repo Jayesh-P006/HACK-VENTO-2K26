@@ -335,8 +335,8 @@ def serialize_application(app):
         'job_title': job.title if job else None,
         'company_name': job.company.company_name if job and job.company else None,
         'status': app.status,
-        'applied_at': app.applied_at.isoformat(),
-        'updated_at': app.updated_at.isoformat(),
+        'applied_at': app.applied_at.isoformat() if getattr(app, 'applied_at', None) else None,
+        'updated_at': app.updated_at.isoformat() if getattr(app, 'updated_at', None) else None,
         'rounds': rounds,
         'rounds_total': total_rounds,
         'rounds_cleared': cleared,
@@ -1360,7 +1360,7 @@ def get_job_applicants(job_id):
         for app in applications:
             student_data = app.student.to_dict()
             student_data['application_status'] = app.status
-            student_data['applied_at'] = app.applied_at.isoformat()
+            student_data['applied_at'] = app.applied_at.isoformat() if getattr(app, 'applied_at', None) else None
             student_data['application_id'] = app.id
             # Add ATS score fields
             student_data['ats_score'] = app.student.ats_score

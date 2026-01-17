@@ -248,7 +248,7 @@ def get_applicants_advanced(job_id):
                 'phone': app.phone,
                 'skills': app.skills,
                 'status': app.status,
-                'applied_at': app.applied_at.isoformat(),
+                'applied_at': app.applied_at.isoformat() if getattr(app, 'applied_at', None) else None,
                 'eligible': eligibility['is_eligible'],
                 'ineligibility_reasons': eligibility['reasons'],
                 'ats_score': float(app.ats_score) if app.ats_score is not None else None,
@@ -631,7 +631,7 @@ def send_offer_letter(offer_id):
         return jsonify({
             'message': 'Offer letter sent to student',
             'offer_id': offer.id,
-            'sent_date': offer.sent_date.isoformat()
+            'sent_date': offer.sent_date.isoformat() if offer.sent_date else None
         }), 200
         
     except Exception as e:

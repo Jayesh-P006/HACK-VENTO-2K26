@@ -31,7 +31,7 @@ class User(db.Model):
             'email': self.email,
             'role_id': self.role_id,
             'is_verified': self.is_verified,
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
 
@@ -209,7 +209,7 @@ class Job(db.Model):
             'session_id': self.session_id,
             'session_name': self.session.name if hasattr(self, 'session') and self.session else None,
             'status': self.status,
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
 
@@ -236,8 +236,8 @@ class Application(db.Model):
             'company_name': self.job.company.company_name if self.job and self.job.company else None,
             'session_id': self.session_id,
             'status': self.status,
-            'applied_at': self.applied_at.isoformat(),
-            'updated_at': self.updated_at.isoformat(),
+            'applied_at': self.applied_at.isoformat() if self.applied_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'notes': self.notes
         }
 
@@ -258,7 +258,7 @@ class Announcement(db.Model):
             'title': self.title,
             'message': self.message,
             'target_role': self.target_role,
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
 
@@ -465,7 +465,7 @@ class OfferLetter(db.Model):
             'status': self.status,
             'sent_date': self.sent_date.isoformat() if self.sent_date else None,
             'acceptance_date': self.acceptance_date.isoformat() if self.acceptance_date else None,
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
 
@@ -511,7 +511,7 @@ class StudentVerification(db.Model):
             'branch': self.student.branch if self.student else None,
             'status': self.status,
             'rejection_reason': self.rejection_reason,
-            'submitted_at': self.submitted_at.isoformat(),
+            'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
             'verification_date': self.verification_date.isoformat() if self.verification_date else None
         }
 
@@ -545,7 +545,7 @@ class StudentBlacklist(db.Model):
             'is_blacklisted': self.is_blacklisted,
             'reason': self.reason,
             'severity': self.severity,
-            'blacklisted_date': self.blacklisted_date.isoformat(),
+            'blacklisted_date': self.blacklisted_date.isoformat() if self.blacklisted_date else None,
             'unblacklist_date': self.unblacklist_date.isoformat() if self.unblacklist_date else None
         }
 

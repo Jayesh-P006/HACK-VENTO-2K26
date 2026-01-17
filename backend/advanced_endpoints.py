@@ -111,7 +111,7 @@ def get_dashboard_summary():
     
     # Get available jobs count
     eligible_jobs = Job.query.filter(
-        Job.status == 'Active',
+        Job.status == 'Approved',
         (Job.min_cgpa is None) | (Job.min_cgpa <= student.cgpa)
     ).count()
     
@@ -239,11 +239,11 @@ def get_notifications():
             'id': notif.id,
             'type': notif.type,
             'title': notif.title,
-            'message': notif.message,
+            'visit_date': visit.visit_date.isoformat() if getattr(visit, 'visit_date', None) else None,
             'is_read': notif.is_read,
             'priority': notif.priority,
             'action_url': notif.action_url,
-            'created_at': notif.created_at.isoformat(),
+            'created_at': notif.created_at.isoformat() if getattr(notif, 'created_at', None) else None,
             'related_entity_type': notif.related_entity_type,
             'related_entity_id': notif.related_entity_id
         })
@@ -335,7 +335,7 @@ def get_interview_experiences():
             'outcome': exp.outcome,
             'rating': exp.rating,
             'interview_date': exp.interview_date.isoformat() if exp.interview_date else None,
-            'created_at': exp.created_at.isoformat()
+            'created_at': exp.created_at.isoformat() if getattr(exp, 'created_at', None) else None
         })
     
     return jsonify(result)
@@ -412,7 +412,7 @@ def get_resume_score(job_id):
         'missing_keywords': score.missing_keywords,
         'matched_keywords': score.matched_keywords,
         'improvement_suggestions': score.improvement_suggestions,
-        'assessed_at': score.assessed_at.isoformat()
+        'assessed_at': score.assessed_at.isoformat() if getattr(score, 'assessed_at', None) else None
     })
 
 
@@ -494,7 +494,7 @@ def get_student_skills():
             'years_of_experience': skill.years_of_experience,
             'market_demand_level': skill.market_demand_level,
             'endorsements': skill.endorsements,
-            'assessment_date': skill.assessment_date.isoformat()
+            'assessment_date': skill.assessment_date.isoformat() if getattr(skill, 'assessment_date', None) else None
         })
     
     return jsonify(result)

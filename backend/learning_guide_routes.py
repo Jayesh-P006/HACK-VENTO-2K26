@@ -77,7 +77,7 @@ def get_applied_companies():
                 'location': job.location,
                 'status': current_stage,
                 'stage_info': stage_info,
-                'applied_at': app.applied_at.isoformat(),
+                'applied_at': app.applied_at.isoformat() if getattr(app, 'applied_at', None) else None,
                 'days_remaining': days_remaining,
                 'round_info': round_info,
                 'requirements': job.requirements,
