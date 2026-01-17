@@ -44,8 +44,52 @@ def _normalize_gemini_model_name(model_name: str | None) -> str:
     name = (model_name or '').strip()
     if not name:
         return 'gemini-1.5-flash'
-    # Some configs might omit the models/ prefix (SDK-style). HTTP API supports both styles.
+
+    # Allow users to paste full resource names or accidental URL-ish values.
+    # Examples:
+    # - models/gemini-2.0-flash
+    # - https://.../v1beta/models/gemini-2.0-flash
+    if '/' in name:
+        name = name.rstrip('/')
+        name = name.split('/')[-1]
+
+    # Common misconfigurations like "v1.5-flash" or "1.5-flash" should map to
+    # the actual model id "gemini-1.5-flash".
+    m = re.fullmatch(r'v?(\d+(?:\.\d+)?)-(flash|pro)', name, flags=re.IGNORECASE)
+    if m:
+        return f'gemini-{m.group(1)}-{m.group(2).lower()}'
+
+    # Tolerate "gemini 3 flash" style.
+    name = re.sub(r'\s+', '-', name)
+    name = name.replace('--', '-')
     return name
+
+
+def _gemini_error_message(exc: Exception) -> str:
+    """Return a safe error message without leaking URLs or API keys."""
+    # httpx HTTP errors can include the full request URL (with ?key=...), so do not
+    # surface str(exc) to the client.
+    if HTTPX_AVAILABLE:
+        try:
+            if isinstance(exc, httpx.HTTPStatusError):
+                status = exc.response.status_code if exc.response is not None else None
+                detail = None
+                try:
+                    payload = exc.response.json() if exc.response is not None else None
+                    detail = (
+                        payload.get('error', {})
+                        .get('message')
+                        if isinstance(payload, dict)
+                        else None
+                    )
+                except Exception:
+                    detail = None
+                if status:
+                    return f'Gemini request failed (HTTP {status})' + (f": {detail}" if detail else '')
+                return 'Gemini request failed'
+        except Exception:
+            pass
+    return 'Gemini request failed'
 
 
 def gemini_generate_text(prompt: str, api_key: str, model_name: str | None = None) -> str:
@@ -57,13 +101,31 @@ def gemini_generate_text(prompt: str, api_key: str, model_name: str | None = Non
         raise RuntimeError('Gemini API key not configured')
 
     model_name = _normalize_gemini_model_name(model_name)
-    fallback_model = 'gemini-1.5-flash'
+
+    # Try the requested model first, then fall back to known-good flash models.
+    # The exact best model varies by account/region and API version.
+    fallback_models = [
+        'gemini-3-flash',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+    ]
+    model_candidates = [model_name] + [m for m in fallback_models if m != model_name]
 
     if GEMINI_SDK_AVAILABLE:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(model_name)
-        response = model.generate_content(prompt)
-        return (response.text or '').strip()
+        last_error: Exception | None = None
+        for m in model_candidates:
+            try:
+                model = genai.GenerativeModel(m)
+                response = model.generate_content(prompt)
+                text = (getattr(response, 'text', None) or '').strip()
+                if not text:
+                    raise RuntimeError('Gemini returned empty text')
+                return text
+            except Exception as e:
+                last_error = e
+        raise RuntimeError(_gemini_error_message(last_error or RuntimeError('Gemini request failed')))
 
     if not HTTPX_AVAILABLE:
         raise RuntimeError('Gemini client not available (missing httpx)')
@@ -84,18 +146,23 @@ def gemini_generate_text(prompt: str, api_key: str, model_name: str | None = Non
         }
         with httpx.Client(timeout=30.0) as client:
             r = client.post(url, params=params, json=payload)
-            r.raise_for_status()
+            try:
+                r.raise_for_status()
+            except Exception as e:
+                # Re-raise as HTTPStatusError (if possible) so we can sanitize.
+                raise
             return r.json()
 
-    try:
-        data = _call(model_name)
-    except Exception as e:
-        # If the configured model doesn't exist (common in demo envs), retry with a known-good default.
-        status_code = getattr(getattr(e, 'response', None), 'status_code', None)
-        if status_code == 404 and model_name != fallback_model:
-            data = _call(fallback_model)
-        else:
-            raise
+    last_error: Exception | None = None
+    for m in model_candidates:
+        try:
+            data = _call(m)
+            break
+        except Exception as e:
+            last_error = e
+            continue
+    else:
+        raise RuntimeError(_gemini_error_message(last_error or RuntimeError('Gemini request failed')))
 
     candidates = data.get('candidates') or []
     if not candidates:
@@ -441,7 +508,8 @@ def calculate_ats_with_gemini(resume_text):
         return None, "Gemini API key not configured"
     
     try:
-        model_name = os.getenv('GEMINI_MODEL', 'gemini-1.5-flash')
+        # Prefer configuration; default to a fast flash model.
+        model_name = os.getenv('GEMINI_MODEL', 'gemini-3-flash')
         
         prompt = f'''You are an expert ATS (Applicant Tracking System) analyzer. Analyze this resume and provide realistic feedback.
 
@@ -488,7 +556,7 @@ Respond in JSON format ONLY (no markdown, no code blocks):
         
     except Exception as e:
         print(f"Gemini API error: {e}")
-        return None, str(e)
+        return None, _gemini_error_message(e)
 
 
 def calculate_ats_with_jd(resume_text, jd_text):
@@ -505,7 +573,7 @@ def calculate_ats_with_jd(resume_text, jd_text):
         return None, "Gemini API key not configured"
     
     try:
-        model_name = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
+        model_name = os.getenv('GEMINI_MODEL', 'gemini-3-flash')
         
         prompt = f'''You are an expert ATS analyzer comparing a resume against a job description.
 
@@ -558,7 +626,7 @@ Respond in JSON format ONLY (no markdown, no code blocks):
         
     except Exception as e:
         print(f"Gemini API error (JD analysis): {e}")
-        return None, str(e)
+        return None, _gemini_error_message(e)
 
 
 @resume_bp.route('/api/student/calculate-ats', methods=['POST'])
