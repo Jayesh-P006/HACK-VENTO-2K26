@@ -763,6 +763,11 @@
         // Render available jobs
         renderJobs();
 
+        // Calendar integration status (non-blocking)
+        try {
+          dashManager?.refreshCalendarStatus?.().catch(() => {});
+        } catch (_) {}
+
         console.log('Dashboard loaded successfully');
       } catch (err) {
         console.error('Dashboard load error:', err);
