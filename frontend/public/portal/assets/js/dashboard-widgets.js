@@ -52,10 +52,10 @@ class DashboardManager {
       // Load all widget data in parallel
       const results = await Promise.all([
         this.api('/student/dashboard-summary'),
-        this.api('/student/applications-summary'),
+        this.api('/student/applications'),
         this.api('/student/notifications?unread=true'),
         this.api('/student/company-visits/upcoming'),
-        this.api('/student/interview-experiences/recent'),
+        this.api('/student/interview-experiences'),
       ]);
 
       const [summary, applications, notifications, visits, interviews] = results;
@@ -74,10 +74,36 @@ class DashboardManager {
         await this.widgets.interviewRepo.render(interviews);
       }
 
+      // Calendar integration status (non-blocking)
+      this.refreshCalendarStatus().catch(() => {});
+
       console.log('Dashboard loaded successfully');
     } catch (err) {
       console.error('Dashboard init error:', err);
       this.showToast(err.message, 'error');
+    }
+  }
+
+  async refreshCalendarStatus() {
+    const badge = document.getElementById('calendar-status-badge');
+    if (!badge) return;
+
+    try {
+      const health = await this.api('/student/calendar/health');
+      const enabled = Boolean(health?.enabled);
+      if (enabled) {
+        badge.className = 'badge badge-green';
+        badge.textContent = '📅 Calendar: Connected';
+        badge.title = 'Calendar events will be created via server integration.';
+      } else {
+        badge.className = 'badge badge-amber';
+        badge.textContent = '📅 Calendar: Link mode';
+        badge.title = 'Server calendar integration is not configured; links will open Google Calendar event creation.';
+      }
+    } catch (e) {
+      badge.className = 'badge badge-amber';
+      badge.textContent = '📅 Calendar: Link mode';
+      badge.title = 'Calendar health check failed; using link-based calendar buttons.';
     }
   }
 
@@ -226,6 +252,42 @@ class KanbanBoardWidget {
     const progress = typeof app.progress_pct === 'number' ? app.progress_pct : 0;
     const roundSteps = rounds.map(r => this.renderRoundStep(r)).join('');
 
+    const roundCalendarLinks = (rounds || [])
+      .filter(r => r && r.scheduled_date)
+      .map(r => {
+        const start = this.parseRoundDateTime(r.scheduled_date, r.scheduled_time);
+        if (!start) return '';
+        const hasTime = Boolean(r.scheduled_time);
+        const end = hasTime ? new Date(start.getTime() + 60 * 60 * 1000) : null;
+        const event = {
+          title: `${app.company_name}: ${app.job_title} — ${r.name || 'Round'}`,
+          details: `Application #${app.id}\nRound: ${r.name || 'Round'}\nStatus: ${r.status || 'Pending'}`,
+          location: r.venue || '',
+          start,
+          end,
+          allDay: !hasTime,
+        };
+        return `<button class="btn btn-secondary" data-add-cal-round="1" data-app-id="${app.id}" data-round-id="${r.round_id || r.id || ''}" data-fallback-url="${this.buildGoogleCalendarUrl(event)}" style="padding: 6px 10px; font-size: 12px;">📅 ${r.sequence ? `${r.sequence}. ` : ''}${r.name || 'Round'}</button>`;
+      })
+      .filter(Boolean);
+
+    const interviewEvent = app?.interview_date ? {
+      title: `${app.company_name}: ${app.job_title} — Interview`,
+      details: `Application #${app.id}\nInterview`,
+      location: app.interview_location || '',
+      start: new Date(app.interview_date),
+      end: new Date(new Date(app.interview_date).getTime() + 60 * 60 * 1000),
+      allDay: false,
+    } : null;
+
+    const interviewCalendarLink = (interviewEvent && !Number.isNaN(interviewEvent.start.getTime()))
+      ? `<button class="btn btn-secondary" data-add-cal-interview="1" data-app-id="${app.id}" data-fallback-url="${this.buildGoogleCalendarUrl(interviewEvent)}" style="padding: 6px 10px; font-size: 12px;">📅 Interview</button>`
+      : '';
+
+    const calendarBlock = (roundCalendarLinks.length || interviewCalendarLink)
+      ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top: 8px;">${roundCalendarLinks.join('')}${interviewCalendarLink}</div>`
+      : '';
+
     return `
       <div class="kanban-card animate" data-app-id="${app.id}" draggable="true">
         <h4>${app.job_title}</h4>
@@ -239,8 +301,110 @@ class KanbanBoardWidget {
         </div>
         ${roundSteps ? `<div class="round-stepper" style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">${roundSteps}</div>` : ''}
         <button class="btn btn-ghost" data-view-app="${app.id}" style="width: 100%; margin-top: 10px; padding: 6px; font-size: 12px;">View</button>
+        ${calendarBlock}
       </div>
     `;
+  }
+
+  findNextScheduledEvent(app, rounds) {
+    // Prefer the nearest upcoming scheduled round with a date
+    const now = new Date();
+    const candidates = [];
+
+    for (const r of rounds || []) {
+      if (!r || !r.scheduled_date) continue;
+
+      const start = this.parseRoundDateTime(r.scheduled_date, r.scheduled_time);
+      if (!start) continue;
+
+      // If only a date is known, treat as all-day; otherwise assume 60 minutes
+      const hasTime = Boolean(r.scheduled_time);
+      const end = hasTime ? new Date(start.getTime() + 60 * 60 * 1000) : null;
+
+      candidates.push({
+        title: `${app.company_name}: ${app.job_title} — ${r.name || 'Round'}`,
+        details: `Application #${app.id}\nRound: ${r.name || 'Round'}\nStatus: ${r.status || 'Pending'}`,
+        location: r.venue || '',
+        start,
+        end,
+        allDay: !hasTime,
+      });
+    }
+
+    // Also consider interview_date if the API includes it
+    if (app?.interview_date) {
+      const start = new Date(app.interview_date);
+      if (!Number.isNaN(start.getTime())) {
+        candidates.push({
+          title: `${app.company_name}: ${app.job_title} — Interview`,
+          details: `Application #${app.id}\nInterview`,
+          location: app.interview_location || '',
+          start,
+          end: new Date(start.getTime() + 60 * 60 * 1000),
+          allDay: false,
+        });
+      }
+    }
+
+    const upcoming = candidates
+      .filter(c => c.start && c.start.getTime() >= (now.getTime() - 5 * 60 * 1000))
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    return upcoming[0] || null;
+  }
+
+  parseRoundDateTime(dateIso, timeStr) {
+    try {
+      // dateIso is YYYY-MM-DD
+      if (!dateIso) return null;
+      if (!timeStr) {
+        // All-day on that date (local)
+        const d = new Date(dateIso + 'T00:00:00');
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+      // timeStr may be HH:MM:SS or HH:MM
+      const t = String(timeStr).trim();
+      const hhmmss = t.length === 5 ? `${t}:00` : t;
+      const d = new Date(`${dateIso}T${hhmmss}`);
+      return Number.isNaN(d.getTime()) ? null : d;
+    } catch {
+      return null;
+    }
+  }
+
+  buildGoogleCalendarUrl(event) {
+    const base = 'https://calendar.google.com/calendar/r/eventedit';
+    const params = new URLSearchParams();
+
+    params.set('text', event.title || 'Interview');
+    if (event.details) params.set('details', event.details);
+    if (event.location) params.set('location', event.location);
+
+    if (event.allDay) {
+      // All-day format: YYYYMMDD/YYYYMMDD (end is exclusive, so +1 day)
+      const start = this.formatYmd(event.start);
+      const end = this.formatYmd(new Date(event.start.getTime() + 24 * 60 * 60 * 1000));
+      params.set('dates', `${start}/${end}`);
+    } else {
+      const start = this.formatGoogleUtc(event.start);
+      const end = this.formatGoogleUtc(event.end || new Date(event.start.getTime() + 60 * 60 * 1000));
+      params.set('dates', `${start}/${end}`);
+    }
+
+    return `${base}?${params.toString()}`;
+  }
+
+  formatGoogleUtc(d) {
+    // YYYYMMDDTHHMMSSZ in UTC
+    const iso = new Date(d).toISOString();
+    return iso.replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  }
+
+  formatYmd(d) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}${mm}${dd}`;
   }
 
   renderRoundStep(round) {
@@ -273,6 +437,76 @@ class KanbanBoardWidget {
     cards.forEach(card => {
       card.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('appId', card.getAttribute('data-app-id'));
+      });
+    });
+
+    // Calendar integration buttons
+    this.container.querySelectorAll('[data-add-cal-round]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const applicationId = btn.getAttribute('data-app-id');
+        const roundId = btn.getAttribute('data-round-id');
+        const fallbackUrl = btn.getAttribute('data-fallback-url');
+
+        if (!applicationId || !roundId) {
+          if (fallbackUrl) window.open(fallbackUrl, '_blank', 'noopener');
+          return;
+        }
+
+        try {
+          btn.disabled = true;
+          const resp = await this.manager.api('/student/calendar/create-round', {
+            method: 'POST',
+            body: { application_id: Number(applicationId), round_id: Number(roundId) },
+          });
+          const link = resp?.html_link;
+          if (link) {
+            window.open(link, '_blank', 'noopener');
+          } else if (fallbackUrl) {
+            window.open(fallbackUrl, '_blank', 'noopener');
+          }
+        } catch (err) {
+          if (fallbackUrl) {
+            window.open(fallbackUrl, '_blank', 'noopener');
+          } else {
+            this.manager.showToast(err.message || 'Failed to create calendar event', 'error');
+          }
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+
+    this.container.querySelectorAll('[data-add-cal-interview]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const applicationId = btn.getAttribute('data-app-id');
+        const fallbackUrl = btn.getAttribute('data-fallback-url');
+        if (!applicationId) {
+          if (fallbackUrl) window.open(fallbackUrl, '_blank', 'noopener');
+          return;
+        }
+        try {
+          btn.disabled = true;
+          const resp = await this.manager.api('/student/calendar/create-interview', {
+            method: 'POST',
+            body: { application_id: Number(applicationId) },
+          });
+          const link = resp?.html_link;
+          if (link) {
+            window.open(link, '_blank', 'noopener');
+          } else if (fallbackUrl) {
+            window.open(fallbackUrl, '_blank', 'noopener');
+          }
+        } catch (err) {
+          if (fallbackUrl) {
+            window.open(fallbackUrl, '_blank', 'noopener');
+          } else {
+            this.manager.showToast(err.message || 'Failed to create calendar event', 'error');
+          }
+        } finally {
+          btn.disabled = false;
+        }
       });
     });
   }

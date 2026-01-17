@@ -16,6 +16,75 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timedelta, date
 from models import *  # Import all SQLAlchemy models
 
+
+def _serialize_application_with_rounds(app):
+    """Serialize an application with hiring rounds + per-round progress.
+
+    This mirrors the student dashboard needs (kanban + calendar button) and
+    keeps this module independent from backend/app.py to avoid circular imports.
+    """
+    job = Job.query.get(app.job_id)
+    company = Company.query.get(job.company_id) if job else None
+
+    hiring_rounds = HiringRound.query.filter_by(job_id=app.job_id).order_by(HiringRound.round_number).all()
+    progress_map = {p.hiring_round_id: p for p in getattr(app, 'round_progresses', [])}
+
+    rounds = []
+    cleared = 0
+    for hr in hiring_rounds:
+        pr = progress_map.get(hr.id)
+        status = pr.status if pr else 'Pending'
+        cleared += 1 if status in ('Passed', 'Completed') else 0
+
+        scheduled_time = None
+        if hasattr(hr, 'scheduled_time') and hr.scheduled_time:
+            try:
+                scheduled_time = hr.scheduled_time.strftime('%H:%M:%S')
+            except Exception:
+                scheduled_time = str(hr.scheduled_time)
+
+        rounds.append({
+            'round_id': hr.id,
+            'name': hr.round_name,
+            'sequence': hr.round_number,
+            'status': status,
+            'is_elimination_round': hr.is_elimination_round if hasattr(hr, 'is_elimination_round') else True,
+            'scheduled_date': hr.scheduled_date.isoformat() if hr.scheduled_date else None,
+            'scheduled_time': scheduled_time,
+            'venue': hr.venue if hasattr(hr, 'venue') else None,
+            'mode': hr.round_mode if hasattr(hr, 'round_mode') else None,
+            'type': hr.round_type if hasattr(hr, 'round_type') else None,
+            'progress_id': pr.id if pr else None,
+        })
+
+    total_rounds = len(hiring_rounds)
+    progress_pct = int((cleared / total_rounds) * 100) if total_rounds else 0
+
+    applied_at = app.applied_at.isoformat() if getattr(app, 'applied_at', None) else None
+    updated_at = app.updated_at.isoformat() if getattr(app, 'updated_at', None) else None
+
+    return {
+        'id': app.id,
+        'student_id': app.student_id,
+        'job_id': app.job_id,
+        'job_title': job.title if job else 'Unknown',
+        'company_name': company.company_name if company else 'Unknown',
+        'status': app.status,
+        'applied_at': applied_at,
+        'updated_at': updated_at,
+        'rounds': rounds,
+        'rounds_total': total_rounds,
+        'rounds_cleared': cleared,
+        'progress_pct': progress_pct,
+        # Keep extended fields too (if present)
+        'interview_date': app.interview_date.isoformat() if getattr(app, 'interview_date', None) else None,
+        'interview_location': getattr(app, 'interview_location', None),
+        'interview_type': getattr(app, 'interview_type', None),
+        'resume_matched_score': getattr(app, 'resume_matched_score', None),
+        'feedback': getattr(app, 'feedback', None),
+        'notes': getattr(app, 'notes', None),
+    }
+
 # ============================================================================
 # STUDENT DASHBOARD SUMMARY ENDPOINT
 # ============================================================================
@@ -491,27 +560,7 @@ def get_student_applications():
         Application.applied_at.desc()
     ).all()
     
-    result = []
-    for app in applications:
-        job = Job.query.get(app.job_id)
-        company = Company.query.get(job.company_id) if job else None
-        
-        result.append({
-            'id': app.id,
-            'job_id': app.job_id,
-            'job_title': job.title if job else 'Unknown',
-            'company_name': company.company_name if company else 'Unknown',
-            'status': app.status,
-            'applied_at': app.applied_at.isoformat(),
-            'interview_date': app.interview_date.isoformat() if app.interview_date else None,
-            'interview_location': app.interview_location,
-            'interview_type': app.interview_type,
-            'resume_matched_score': app.resume_matched_score,
-            'feedback': app.feedback,
-            'notes': app.notes,
-            'updated_at': app.updated_at.isoformat()
-        })
-    
+    result = [_serialize_application_with_rounds(app) for app in applications]
     return jsonify(result)
 
 

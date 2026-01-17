@@ -87,6 +87,29 @@ def _maybe_init_database():
                 if columns_to_add:
                     db.session.commit()
 
+            def ensure_student_resume_columns():
+                if not inspector.has_table('students'):
+                    return
+                existing_cols = {col['name'] for col in inspector.get_columns('students')}
+                columns_to_add = []
+
+                if 'resume_storage_provider' not in existing_cols:
+                    columns_to_add.append("ADD COLUMN resume_storage_provider ENUM('local','drive') DEFAULT 'local'")
+                if 'resume_filename' not in existing_cols:
+                    columns_to_add.append("ADD COLUMN resume_filename VARCHAR(255) NULL")
+                if 'resume_drive_file_id' not in existing_cols:
+                    columns_to_add.append("ADD COLUMN resume_drive_file_id VARCHAR(128) NULL")
+                if 'resume_drive_web_view_link' not in existing_cols:
+                    columns_to_add.append("ADD COLUMN resume_drive_web_view_link VARCHAR(500) NULL")
+                if 'resume_updated_at' not in existing_cols:
+                    columns_to_add.append("ADD COLUMN resume_updated_at DATETIME NULL")
+
+                for column_sql in columns_to_add:
+                    print(f"[db] Adding students column: {column_sql}")
+                    db.session.execute(text(f"ALTER TABLE students {column_sql}"))
+                if columns_to_add:
+                    db.session.commit()
+
             # Seed master data (departments, batches, skills)
             if not has_departments or Department.query.count() == 0:
                 print('[db] seeding departments...')
@@ -120,6 +143,9 @@ def _maybe_init_database():
             # Ensure OTP columns exist for verification tables
             ensure_otp_columns('student_verification')
             ensure_otp_columns('admin_verification')
+
+            # Ensure resume storage metadata columns exist
+            ensure_student_resume_columns()
 
             seed = os.getenv('SEED_DEMO_USERS', '1').strip().lower() in ('1', 'true', 'yes', 'y', 'on')
             if not seed:
@@ -293,6 +319,7 @@ def serialize_application(app):
             'is_elimination_round': hr.is_elimination_round,
             'scheduled_date': hr.scheduled_date.isoformat() if hr.scheduled_date else None,
             'scheduled_time': str(hr.scheduled_time) if hasattr(hr, 'scheduled_time') and hr.scheduled_time else None,
+            'venue': hr.venue if hasattr(hr, 'venue') else None,
             'mode': hr.round_mode,
             'type': hr.round_type,
             'progress_id': pr.id if pr else None,
@@ -326,6 +353,7 @@ from hiring_rounds_routes import hiring_rounds_bp
 from session_routes import session_bp
 from email_reminder_routes import email_reminder_bp
 from ai_calling_routes import ai_calling_bp
+from calendar_routes import calendar_bp
 
 app.register_blueprint(company_bp)
 app.register_blueprint(admin_bp)
@@ -335,6 +363,7 @@ app.register_blueprint(hiring_rounds_bp)
 app.register_blueprint(session_bp)
 app.register_blueprint(email_reminder_bp)
 app.register_blueprint(ai_calling_bp)
+app.register_blueprint(calendar_bp)
 
 # ==================== Authentication Routes ====================
 

@@ -38,6 +38,13 @@ DB_PASSWORD=<from Railway MySQL>
 DB_NAME=<from Railway MySQL>
 DB_PORT=3306
 GEMINI_API_KEY=your_gemini_api_key_here
+
+# Google Drive (Resume storage)
+GOOGLE_SERVICE_ACCOUNT_JSON=...json...
+GOOGLE_DRIVE_FOLDER_ID=...
+
+# Google Calendar (Org/shared calendar)
+GOOGLE_CALENDAR_ID=...
 GROQ_API_KEY=your_groq_api_key_here
 ```
 

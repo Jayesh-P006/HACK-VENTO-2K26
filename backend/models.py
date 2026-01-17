@@ -51,6 +51,14 @@ class Student(db.Model):
     current_year = db.Column(db.SmallInteger)  # 1-4 year of study
     phone = db.Column(db.String(15))
     resume_url = db.Column(db.String(500))
+
+    # Resume storage metadata (Drive/local)
+    resume_storage_provider = db.Column(db.Enum('local', 'drive'), default='local')
+    resume_filename = db.Column(db.String(255))
+    resume_drive_file_id = db.Column(db.String(128))
+    resume_drive_web_view_link = db.Column(db.String(500))
+    resume_updated_at = db.Column(db.DateTime)
+
     ats_score = db.Column(db.Integer)  # ATS score 0-100
     ats_feedback = db.Column(db.Text)  # Detailed ATS feedback from Gemini
     ats_calculated_at = db.Column(db.DateTime)  # When ATS was last calculated
@@ -82,6 +90,11 @@ class Student(db.Model):
             'batch_code': self.batch.batch_code if hasattr(self, 'batch') and self.batch else None,
             'phone': self.phone,
             'resume_url': self.resume_url,
+            'resume_storage_provider': self.resume_storage_provider,
+            'resume_filename': self.resume_filename,
+            'resume_drive_file_id': self.resume_drive_file_id,
+            'resume_drive_web_view_link': self.resume_drive_web_view_link,
+            'resume_updated_at': self.resume_updated_at.isoformat() if self.resume_updated_at else None,
             'ats_score': self.ats_score,
             'ats_feedback': self.ats_feedback,
             'ats_calculated_at': self.ats_calculated_at.isoformat() if self.ats_calculated_at else None,
@@ -93,6 +106,28 @@ class Student(db.Model):
             'github_url': self.github_url,
             'profile_completed': self.profile_completed
         }
+
+
+class StudentCalendarEvent(db.Model):
+    __tablename__ = 'student_calendar_events'
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey('students.id'), nullable=False)
+    application_id = db.Column(db.Integer, db.ForeignKey('applications.id'))
+    round_id = db.Column(db.Integer, db.ForeignKey('hiring_rounds.id'))
+
+    calendar_id = db.Column(db.String(255), nullable=False)
+    google_event_id = db.Column(db.String(255), nullable=False)
+    html_link = db.Column(db.String(500))
+
+    title = db.Column(db.String(500))
+    location = db.Column(db.String(500))
+    start_at = db.Column(db.DateTime)
+    end_at = db.Column(db.DateTime)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    student = db.relationship('Student', backref='calendar_events')
 
 
 class Company(db.Model):

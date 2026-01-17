@@ -89,6 +89,7 @@
       <section style="margin-top: 18px;">
         <div class="section-title">
           <h3>📋 My Applications (Kanban View)</h3>
+          <span class="badge badge-blue" id="calendar-status-badge">📅 Calendar: Checking…</span>
           <button class="btn btn-ghost" id="refresh-kanban" style="padding: 4px 10px; font-size: 12px;">Refresh</button>
         </div>
         <div id="kanban-widget" style="margin-top: 12px;"></div>
@@ -1341,7 +1342,8 @@
       if (resumeUrl) {
         resumeStatus.textContent = '✅ Resume uploaded';
         resumeStatus.style.color = '#10b981';
-        resumeLink.href = resumeUrl;
+        // Always serve via backend so Drive resumes work even if not publicly shared
+        resumeLink.href = `${API_BASE}/student/resume/download?inline=1`;
         resumeLink.style.display = 'inline-block';
         deleteResumeBtn.style.display = 'inline-block';
         calculateAtsBtn.style.display = 'inline-block';

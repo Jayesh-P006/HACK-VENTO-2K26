@@ -3,7 +3,8 @@ import re
 import json
 import PyPDF2
 from io import BytesIO
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
+import io
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from models import db, User, Student
@@ -17,14 +18,13 @@ try:
 except ImportError:
     HTTPX_AVAILABLE = False
 
-# Google Drive client
-try:
-    from google.oauth2 import service_account
-    from googleapiclient.discovery import build
-    from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
-    DRIVE_AVAILABLE = True
-except ImportError:
-    DRIVE_AVAILABLE = False
+from google_drive_service import (
+    drive_configured,
+    upload_file as upload_file_to_drive,
+    download_file as download_drive_file,
+    delete_file as delete_drive_file,
+    extract_file_id as extract_drive_file_id,
+)
 
 # Load environment variables
 env_path = Path(__file__).parent / '.env'
@@ -114,97 +114,11 @@ resume_bp = Blueprint('resume', __name__)
 UPLOAD_FOLDER = Path(__file__).parent / 'uploads' / 'resumes'
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
-DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.file']
 DRIVE_FOLDER_ID = os.getenv('GOOGLE_DRIVE_FOLDER_ID')
 
-def drive_configured():
-    """Check if Drive is usable (libs + credentials)."""
-    if not DRIVE_AVAILABLE:
-        return False
-    return bool(os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON') or os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE') or os.getenv('GOOGLE_APPLICATION_CREDENTIALS'))
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-def get_drive_service():
-    if not drive_configured():
-        return None
-    creds = None
-    try:
-        if os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON'):
-            creds = service_account.Credentials.from_service_account_info(
-                json.loads(os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')),
-                scopes=DRIVE_SCOPES
-            )
-        else:
-            cred_path = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE') or os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-            if cred_path and Path(cred_path).exists():
-                creds = service_account.Credentials.from_service_account_file(cred_path, scopes=DRIVE_SCOPES)
-        if not creds:
-            return None
-        return build('drive', 'v3', credentials=creds, cache_discovery=False)
-    except Exception as e:
-        print(f"Drive client error: {e}")
-        return None
-
-def upload_file_to_drive(file_bytes, filename, mime_type):
-    service = get_drive_service()
-    if not service:
-        return None
-    try:
-        media = MediaIoBaseUpload(BytesIO(file_bytes), mimetype=mime_type or 'application/pdf', resumable=False)
-        metadata = {'name': filename}
-        if DRIVE_FOLDER_ID:
-            metadata['parents'] = [DRIVE_FOLDER_ID]
-        drive_file = service.files().create(body=metadata, media_body=media, fields='id, webViewLink, webContentLink').execute()
-        try:
-            service.permissions().create(fileId=drive_file['id'], body={'role': 'reader', 'type': 'anyone'}).execute()
-        except Exception as share_error:
-            print(f"Drive share warning: {share_error}")
-        return drive_file
-    except Exception as e:
-        print(f"Drive upload failed: {e}")
-        return None
-
-def download_drive_file(file_id):
-    service = get_drive_service()
-    if not service:
-        return None
-    try:
-        request = service.files().get_media(fileId=file_id)
-        fh = BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while not done:
-            _, done = downloader.next_chunk()
-        fh.seek(0)
-        return fh.read()
-    except Exception as e:
-        print(f"Drive download failed: {e}")
-        return None
-
-def delete_drive_file(file_id):
-    service = get_drive_service()
-    if not service:
-        return False
-    try:
-        service.files().delete(fileId=file_id).execute()
-        return True
-    except Exception as e:
-        print(f"Drive delete failed: {e}")
-        return False
-
-def extract_drive_file_id(value):
-    if not value:
-        return None
-    if re.fullmatch(r'[A-Za-z0-9_-]{10,}', value):
-        return value
-    patterns = [r'/d/([^/]+)', r'id=([A-Za-z0-9_-]+)']
-    for pattern in patterns:
-        match = re.search(pattern, value)
-        if match:
-            return match.group(1)
-    return None
 
 def extract_text_from_pdf(pdf_path):
     """Extract text from PDF file"""
@@ -232,7 +146,7 @@ def extract_text_from_pdf_bytes(content):
 
 def get_stored_resume_bytes(student):
     """Fetch resume bytes from Drive if available, otherwise local storage."""
-    drive_id = extract_drive_file_id(student.resume_url)
+    drive_id = getattr(student, 'resume_drive_file_id', None) or extract_drive_file_id(student.resume_url)
     if drive_id:
         data = download_drive_file(drive_id)
         if data:
@@ -390,16 +304,36 @@ def upload_resume():
         storage = 'local'
         resume_url = None
         if drive_configured():
-            drive_file = upload_file_to_drive(file_bytes, filename, file.mimetype)
+            drive_file = upload_file_to_drive(file_bytes, filename, file.mimetype, folder_id=DRIVE_FOLDER_ID)
             if drive_file:
                 resume_url = drive_file.get('webViewLink') or drive_file.get('webContentLink')
                 storage = 'drive'
+                if hasattr(student, 'resume_storage_provider'):
+                    student.resume_storage_provider = 'drive'
+                if hasattr(student, 'resume_drive_file_id'):
+                    student.resume_drive_file_id = drive_file.get('id')
+                if hasattr(student, 'resume_drive_web_view_link'):
+                    student.resume_drive_web_view_link = drive_file.get('webViewLink')
+                if hasattr(student, 'resume_filename'):
+                    student.resume_filename = drive_file.get('name') or filename
+                if hasattr(student, 'resume_updated_at'):
+                    student.resume_updated_at = datetime.utcnow()
         
         if not resume_url:
             filepath = UPLOAD_FOLDER / filename
             filepath.write_bytes(file_bytes)
             resume_url = f"/uploads/resumes/{filename}"
             storage = 'local'
+            if hasattr(student, 'resume_storage_provider'):
+                student.resume_storage_provider = 'local'
+            if hasattr(student, 'resume_drive_file_id'):
+                student.resume_drive_file_id = None
+            if hasattr(student, 'resume_drive_web_view_link'):
+                student.resume_drive_web_view_link = None
+            if hasattr(student, 'resume_filename'):
+                student.resume_filename = filename
+            if hasattr(student, 'resume_updated_at'):
+                student.resume_updated_at = datetime.utcnow()
         
         # Update student record
         student.resume_url = resume_url
@@ -460,7 +394,7 @@ def delete_resume():
             return jsonify({'error': 'No resume to delete'}), 400
         
         drive_deleted = False
-        drive_id = extract_drive_file_id(student.resume_url)
+        drive_id = getattr(student, 'resume_drive_file_id', None) or extract_drive_file_id(student.resume_url)
         if drive_id:
             drive_deleted = delete_drive_file(drive_id)
         
@@ -472,6 +406,16 @@ def delete_resume():
         
         # Update student record
         student.resume_url = None
+        if hasattr(student, 'resume_storage_provider'):
+            student.resume_storage_provider = 'local'
+        if hasattr(student, 'resume_drive_file_id'):
+            student.resume_drive_file_id = None
+        if hasattr(student, 'resume_drive_web_view_link'):
+            student.resume_drive_web_view_link = None
+        if hasattr(student, 'resume_filename'):
+            student.resume_filename = None
+        if hasattr(student, 'resume_updated_at'):
+            student.resume_updated_at = None
         student.ats_score = None
         student.ats_feedback = None
         student.ats_calculated_at = None
@@ -839,6 +783,64 @@ def analyze_resume_with_jd():
         
     except Exception as e:
         print(f"Error in analyze_resume_with_jd: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@resume_bp.route('/api/student/resume/download', methods=['GET'])
+@jwt_required()
+def download_profile_resume():
+    """Download (or inline-view) the student's stored resume.
+
+    This works for both local uploads and Google Drive storage without requiring
+    the client to access Drive directly.
+    """
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        if not user or user.role_id != 1:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        student = user.student
+        if not student or not student.resume_url:
+            return jsonify({'error': 'No resume uploaded'}), 404
+
+        resume_bytes, source = get_stored_resume_bytes(student)
+        if not resume_bytes:
+            return jsonify({'error': 'Resume not found'}), 404
+
+        inline = request.args.get('inline', '1') in ('1', 'true', 'yes')
+
+        filename = 'resume.pdf'
+        try:
+            if student.resume_url and '/uploads/resumes/' in student.resume_url:
+                filename = student.resume_url.split('/uploads/resumes/')[-1] or filename
+            elif student.resume_url and student.resume_url.startswith('http'):
+                # If it's a Drive link, keep a generic filename
+                filename = 'resume.pdf'
+        except Exception:
+            filename = 'resume.pdf'
+
+        file_obj = io.BytesIO(resume_bytes)
+        file_obj.seek(0)
+
+        try:
+            return send_file(
+                file_obj,
+                mimetype='application/pdf',
+                as_attachment=not inline,
+                download_name=filename,
+                max_age=0,
+            )
+        except TypeError:
+            # Flask < 2.0 compatibility
+            return send_file(
+                file_obj,
+                mimetype='application/pdf',
+                as_attachment=not inline,
+                attachment_filename=filename,
+                cache_timeout=0,
+            )
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 

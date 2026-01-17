@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models import db, User, Application, Job
 from groq import Groq
+from resume_routes import get_resume_text
 
 learning_guide_bp = Blueprint('learning_guide', __name__, url_prefix='/api/student/learning-guide')
 
@@ -132,6 +133,17 @@ def generate_learning_roadmap():
                 days_remaining = "Deadline passed"
         
         # Prepare context for AI
+        resume_context = ""
+        used_resume = False
+        try:
+            if getattr(student, 'resume_url', None):
+                resume_text, resume_err = get_resume_text(student)
+                if not resume_err and resume_text:
+                    used_resume = True
+                    resume_context = f"\nResume Highlights (for personalization):\n{resume_text[:2000]}\n"
+        except Exception:
+            resume_context = ""
+
         student_context = f"""
 Student Profile:
 - Name: {student.full_name}
@@ -139,6 +151,7 @@ Student Profile:
 - CGPA: {student.cgpa if student.cgpa else 'Not specified'}
 - Current Status: {application.status}
 - Skills: {student.skills if hasattr(student, 'skills') and student.skills else 'Not specified'}
+{resume_context}
 """
         
         job_context = f"""
@@ -228,7 +241,8 @@ Keep each section concise and actionable. Use bullet points. No lengthy paragrap
                 'days_remaining': days_remaining,
                 'roadmap_content': roadmap_content,
                 'generated_at': datetime.now().isoformat(),
-                'application_id': application_id
+                'application_id': application_id,
+                'used_resume': used_resume
             }
             
             return jsonify(roadmap_data), 200

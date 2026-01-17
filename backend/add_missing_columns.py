@@ -31,6 +31,13 @@ columns_to_add = [
     ("linkedin_url", "VARCHAR(500) DEFAULT NULL"),
     ("github_url", "VARCHAR(500) DEFAULT NULL"),
     ("current_year", "SMALLINT DEFAULT NULL COMMENT 'Current study year (1-4)'"),
+
+    # Resume storage metadata
+    ("resume_storage_provider", "ENUM('local','drive') DEFAULT 'local'"),
+    ("resume_filename", "VARCHAR(255) DEFAULT NULL"),
+    ("resume_drive_file_id", "VARCHAR(128) DEFAULT NULL"),
+    ("resume_drive_web_view_link", "VARCHAR(500) DEFAULT NULL"),
+    ("resume_updated_at", "DATETIME DEFAULT NULL"),
 ]
 
 print("Adding missing columns to students table...")
