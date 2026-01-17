@@ -1750,6 +1750,46 @@ def get_announcements():
 
 # ==================== ATS Scoring Integration ====================
 
+def _build_resume_text_from_profile(student):
+    parts = []
+    try:
+        parts.append(f"Name: {student.full_name}")
+    except Exception:
+        pass
+
+    try:
+        parts.append(f"Branch: {student.branch}")
+    except Exception:
+        pass
+
+    try:
+        parts.append(f"CGPA: {student.cgpa}")
+    except Exception:
+        pass
+
+    try:
+        parts.append(f"Graduation Year: {student.graduation_year}")
+    except Exception:
+        pass
+
+    for label, value in (
+        ("Skills", getattr(student, 'skills', None)),
+        ("Experience", getattr(student, 'experience', None)),
+        ("Projects", getattr(student, 'projects', None)),
+        ("Certifications", getattr(student, 'certifications', None)),
+        ("LinkedIn", getattr(student, 'linkedin_url', None)),
+        ("GitHub", getattr(student, 'github_url', None)),
+    ):
+        if value:
+            parts.append(f"{label}: {value}")
+
+    # Give the ATS parser some structure even if the profile is sparse
+    if not parts:
+        return ""
+
+    parts.append("Summary: Generated from profile details (no resume file available).")
+    return "\n".join(parts)
+
 @app.route('/api/student/ats-score/<int:job_id>', methods=['GET'])
 @jwt_required()
 def get_ats_score_for_job(job_id):
@@ -1763,10 +1803,6 @@ def get_ats_score_for_job(job_id):
         
         student = user.student
         
-        # Check if student has resume
-        if not student.resume_url:
-            return jsonify({'error': 'No resume uploaded. Please upload your resume first.'}), 400
-        
         # Get job details
         job = Job.query.get(job_id)
         if not job:
@@ -1774,10 +1810,34 @@ def get_ats_score_for_job(job_id):
         
         # Extract resume text (Drive/local aware)
         from ats_scorer import calculate_ats_score
-        resume_text, error = get_resume_text(student)
-        if error:
-            status = 404 if 'not found' in error.lower() else 400
-            return jsonify({'error': error}), status
+        resume_text = ''
+        resume_source = 'profile'
+        resume_warning = None
+        if getattr(student, 'resume_url', None):
+            resume_text, error = get_resume_text(student)
+            if error:
+                resume_warning = error
+                resume_text = ''
+                resume_source = 'profile'
+            else:
+                resume_source = 'uploaded'
+
+        if not (resume_text or '').strip():
+            resume_text = _build_resume_text_from_profile(student)
+            resume_source = 'profile'
+
+        if not (resume_text or '').strip():
+            return jsonify({
+                'success': True,
+                'job_id': job_id,
+                'job_title': job.title,
+                'company_name': job.company.company_name if job.company else 'N/A',
+                'ats_score': 0,
+                'level': 'Unknown',
+                'summary': 'Add resume or profile details to calculate ATS score.',
+                'resume_source': resume_source,
+                'resume_warning': resume_warning,
+            }), 200
         
         # Build JD text from job details
         jd_text = f"""
@@ -1807,7 +1867,9 @@ Experience Required: Check description
             'company_name': job.company.company_name if job.company else 'N/A',
             'ats_score': round(result['score']),
             'level': result['level'],
-            'summary': result['summary']
+            'summary': result['summary'],
+            'resume_source': resume_source,
+            'resume_warning': resume_warning,
         }), 200
         
     except Exception as e:
@@ -1829,10 +1891,6 @@ def get_ats_analysis_for_job(job_id):
         
         student = user.student
         
-        # Check if student has resume
-        if not student.resume_url:
-            return jsonify({'error': 'No resume uploaded. Please upload your resume first.'}), 400
-        
         # Get job details
         job = Job.query.get(job_id)
         if not job:
@@ -1840,10 +1898,43 @@ def get_ats_analysis_for_job(job_id):
         
         # Extract resume text (Drive/local aware)
         from ats_scorer import calculate_ats_score
-        resume_text, error = get_resume_text(student)
-        if error:
-            status = 404 if 'not found' in error.lower() else 400
-            return jsonify({'error': error}), status
+        resume_text = ''
+        resume_source = 'profile'
+        resume_warning = None
+        if getattr(student, 'resume_url', None):
+            resume_text, error = get_resume_text(student)
+            if error:
+                resume_warning = error
+                resume_text = ''
+                resume_source = 'profile'
+            else:
+                resume_source = 'uploaded'
+
+        if not (resume_text or '').strip():
+            resume_text = _build_resume_text_from_profile(student)
+            resume_source = 'profile'
+
+        if not (resume_text or '').strip():
+            return jsonify({
+                'success': True,
+                'job_id': job_id,
+                'job_title': job.title,
+                'company_name': job.company.company_name if job.company else 'N/A',
+                'ats_score': 0,
+                'level': 'Unknown',
+                'summary': 'Add resume or profile details to generate ATS analysis.',
+                'scores': {},
+                'strengths': [],
+                'missing_required': [],
+                'preferred_matched': [],
+                'preferred_missing': [],
+                'resume_details': {},
+                'jd_details': {},
+                'heatmap_data': [],
+                'recommendations': ['Upload a resume for a more accurate analysis.'],
+                'resume_source': resume_source,
+                'resume_warning': resume_warning,
+            }), 200
         
         # Build JD text from job details
         jd_text = f"""
@@ -1912,7 +2003,9 @@ Experience Required: Check description
             'resume_details': report['resume_details'],
             'jd_details': report['jd_details'],
             'heatmap_data': result['heatmap_data'],
-            'recommendations': recommendations
+            'recommendations': recommendations,
+            'resume_source': resume_source,
+            'resume_warning': resume_warning,
         }), 200
         
     except Exception as e:
